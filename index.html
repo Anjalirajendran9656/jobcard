@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoFix Application</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Professional Blue & White Theme -->
+    <style type="text/tailwindcss">
+        :root {
+            --primary-color: #2563eb; /* Blue 600 */
+            --primary-hover: #1d4ed8; /* Blue 700 */
+            --background-color: #f9fafb; /* Gray 50 */
+            --card-background: #ffffff;
+            --border-color: #e5e7eb; /* Gray 200 */
+            --text-primary: #111827; /* Gray 900 */
+            --text-secondary: #6b7280; /* Gray 500 */
+            --text-on-primary: #ffffff;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+        .screen { display: none; }
+        .active-screen { display: block; }
+        .modal-hidden { display: none; }
+        
+        /* Component Styles */
+        .form-input { @apply w-full rounded-lg border-[var(--border-color)] text-base shadow-sm transition-colors focus:border-[var(--primary-color)] focus:ring focus:ring-[var(--primary-color)] focus:ring-opacity-50; }
+        .form-label { @apply block text-sm font-medium text-[var(--text-secondary)] mb-1; }
+        .btn-primary { @apply w-full flex justify-center items-center gap-2 rounded-lg bg-[var(--primary-color)] text-[var(--text-on-primary)] font-bold py-3 px-4 shadow-sm hover:bg-[var(--primary-hover)] transition-all duration-300 transform hover:scale-[1.02]; }
+        .btn-secondary { @apply w-full flex justify-center items-center gap-2 rounded-lg bg-[var(--text-secondary)] text-[var(--text-on-primary)] font-bold py-3 px-4 shadow-sm hover:bg-[var(--text-primary)] transition-colors duration-300 transform hover:scale-[1.02]; }
+        .card { @apply bg-[var(--card-background)] p-5 rounded-xl border border-[var(--border-color)] shadow-sm; }
+        .app-header { @apply bg-white border-b border-[var(--border-color)] sticky top-0 z-10; }
+        .app-header-content { @apply max-w-7xl mx-auto p-4 flex justify-between items-center relative; }
+        .app-main { @apply p-4 max-w-7xl mx-auto space-y-6 pb-24; }
+
+        /* Bottom Nav Styling */
+        .bottom-nav { @apply fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border-color)] shadow-[0_-2px_5px_rgba(0,0,0,0.05)]; }
+        .nav-item { @apply flex flex-col items-center justify-center flex-1 py-2 gap-1 text-[var(--text-secondary)] transition-colors; }
+        .nav-item.active { @apply text-[var(--primary-color)]; }
+        .nav-item .material-symbols-outlined { @apply text-2xl; }
+        .nav-item span { @apply text-xs font-medium; }
+
+        /* Report Table Styles */
+        .table-container { @apply w-full overflow-hidden rounded-lg border border-[var(--border-color)]; }
+        .table-scroll { @apply w-full h-[60vh] overflow-auto; }
+        .report-table { @apply min-w-full divide-y divide-[var(--border-color)]; }
+        .report-table th { @apply sticky top-0 bg-gray-50 px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider z-10; }
+        .report-table td { @apply px-4 py-4 whitespace-nowrap text-sm; }
+        .report-table tbody tr:nth-child(even) { @apply bg-white; }
+        .report-table tbody tr:nth-child(odd) { @apply bg-gray-50; }
+    </style>
+</head>
+<body>
+    <!-- =================================================================== -->
+    <!-- Screen: Login (For Both Users)                                      -->
+    <!-- =================================================================== -->
+    <div id="login-screen" class="screen active-screen">
+        <div class="flex flex-col min-h-screen justify-center items-center p-4 bg-gray-50">
+            <div class="w-full max-w-sm">
+                <div class="flex justify-center items-center gap-3 mb-8"><span class="material-symbols-outlined text-4xl text-[var(--primary-color)]">minor_crash</span><h1 class="text-3xl font-bold tracking-tight text-[var(--text-primary)]">AutoFix</h1></div>
+                <div class="card space-y-6">
+                    <div class="text-center"><h2 class="text-2xl font-bold text-gray-800">Welcome</h2><p class="text-[var(--text-secondary)] mt-1">Please select your role to sign in.</p></div>
+                    <form onsubmit="event.preventDefault();">
+                        <div class="space-y-4">
+                            <div><label for="username" class="form-label">Username</label><div class="relative"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">person</span><input class="form-input pl-10" id="username" placeholder="Enter your username" type="text" /></div></div>
+                            <div><label for="password" class="form-label">Password</label><div class="relative"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">lock</span><input class="form-input pl-10" id="password" placeholder="Enter your password" type="password" /></div></div>
+                        </div>
+                        <div class="mt-6 space-y-3">
+                            <button onclick="login('executive')" class="btn-primary">
+                              <span class="material-symbols-outlined">badge</span>Sign In as Executive
+                            </button>
+                            <button onclick="login('admin')" class="btn-secondary">
+                              <span class="material-symbols-outlined">admin_panel_settings</span>Sign In as Admin
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- ADMIN SCREENS                                                       -->
+    <!-- =================================================================== -->
+    <div id="admin-screens" class="screen">
+        <div id="admin-dashboard-screen" class="admin-screen active-admin-screen">
+             <header class="app-header"><div class="app-header-content"><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Admin Dashboard</h1><button onclick="logout()" class="absolute right-4 flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--primary-color)]"><span class="font-medium text-sm hidden sm:block">Logout</span><span class="material-symbols-outlined">logout</span></button></div></header>
+            <main class="app-main grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-vehicle-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">minor_crash</span><h2 class="text-lg font-bold mt-2">Vehicle Management</h2><p class="text-sm text-[var(--text-secondary)]">Create & Delete Brands/Models</p></a>
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-reports-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">assessment</span><h2 class="text-lg font-bold mt-2">Reports</h2><p class="text-sm text-[var(--text-secondary)]">View & Filter All Reports</p></a>
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-analytics-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">monitoring</span><h2 class="text-lg font-bold mt-2">Analytics</h2><p class="text-sm text-[var(--text-secondary)]">View Complaint & Executive Stats</p></a>
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-executive-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">manage_accounts</span><h2 class="text-lg font-bold mt-2">Executive Management</h2><p class="text-sm text-[var(--text-secondary)]">Create & Delete Executives</p></a>
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-admin-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">admin_panel_settings</span><h2 class="text-lg font-bold mt-2">Admin Management</h2><p class="text-sm text-[var(--text-secondary)]">Manage Admins & Passwords</p></a>
+            </main>
+        </div>
+        
+        <div id="admin-vehicle-management-screen" class="admin-screen" style="display:none;">
+            <header class="app-header"><div class="app-header-content"><button class="absolute left-4 text-[var(--text-secondary)] hover:text-[var(--primary-color)]" onclick="showAdminScreen('admin-dashboard-screen')"><span class="material-symbols-outlined">arrow_back_ios_new</span></button><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Vehicle Management</h1></div></header>
+            <main class="app-main">
+                <div class="card"><h2 class="text-xl font-bold mb-4">Create New Vehicle Brand & Model</h2><form id="add-vehicle-model-form" onsubmit="event.preventDefault(); addVehicleModel();" class="space-y-4"><input id="new-brand-admin" class="form-input" placeholder="Enter Brand (e.g., Maruti Suzuki)" required /><input id="new-model-admin" class="form-input" placeholder="Enter Model (e.g., Swift)" required /><button type="submit" class="btn-primary"><span class="material-symbols-outlined">add</span>Add Vehicle Model</button></form></div>
+                <div class="card space-y-3"><h2 class="text-xl font-bold">Existing Brands & Models</h2><div id="vehicle-models-list"></div></div>
+            </main>
+        </div>
+
+        <div id="admin-reports-screen" class="admin-screen" style="display: none;">
+            <header class="app-header"><div class="app-header-content"><button class="absolute left-4 text-[var(--text-secondary)] hover:text-[var(--primary-color)]" onclick="showAdminScreen('admin-dashboard-screen')"><span class="material-symbols-outlined">arrow_back_ios_new</span></button><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Admin Reports</h1></div></header>
+            <main class="app-main">
+                <div class="card">
+                    <h2 class="text-xl font-bold mb-4">Filter Reports</h2>
+                    <div id="admin-report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
+                        <input type="date" id="admin-filter-date" class="form-input" oninput="applyAdminReportFilters()">
+                        <input type="month" id="admin-filter-month" class="form-input" oninput="applyAdminReportFilters()">
+                        <input type="text" id="admin-filter-vehicle-no" class="form-input" placeholder="Vehicle Number" oninput="applyAdminReportFilters()">
+                        <input type="text" id="admin-filter-brand" class="form-input" placeholder="Brand" oninput="applyAdminReportFilters()">
+                        <input type="text" id="admin-filter-exec-name" class="form-input" placeholder="Executive Name" oninput="applyAdminReportFilters()">
+                        <button onclick="clearAdminReportFilters()" class="text-sm h-11 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300">Clear Filters</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2 class="text-xl font-bold mb-4">Service History</h2>
+                    <div class="table-container"><div class="table-scroll"><table class="report-table">
+                        <thead><tr><th>Vehicle No.</th><th>Model</th><th>Brand</th><th>Executive</th><th>Date & Time</th><th>Status</th></tr></thead>
+                        <tbody id="admin-report-table-body"></tbody>
+                    </table></div></div>
+                    <p id="admin-no-reports-message" class="text-center text-gray-500 py-8 hidden">No reports found matching your criteria.</p>
+                </div>
+            </main>
+        </div>
+
+        <div id="admin-analytics-screen" class="admin-screen" style="display: none;">
+             <header class="app-header"><div class="app-header-content"><button class="absolute left-4 text-[var(--text-secondary)] hover:text-[var(--primary-color)]" onclick="showAdminScreen('admin-dashboard-screen')"><span class="material-symbols-outlined">arrow_back_ios_new</span></button><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Analytics</h1></div></header>
+             <main class="app-main">
+                <div class="card"><h2 class="text-xl font-bold mb-4">Filter Analytics</h2><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><select id="analytics-month-filter" class="form-input" onchange="renderAnalytics()"><option value="">All Months</option></select><select id="analytics-exec-filter" class="form-input" onchange="renderAnalytics()"><option value="">All Executives</option></select></div></div>
+                <div class="card space-y-4"><h2 id="analytics-title" class="text-xl font-bold">Overall Complaint Status</h2><div id="analytics-chart"></div></div>
+             </main>
+        </div>
+
+        <div id="admin-executive-management-screen" class="admin-screen" style="display: none;">
+            <header class="app-header"><div class="app-header-content"><button class="absolute left-4 text-[var(--text-secondary)] hover:text-[var(--primary-color)]" onclick="showAdminScreen('admin-dashboard-screen')"><span class="material-symbols-outlined">arrow_back_ios_new</span></button><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Executive Management</h1></div></header>
+            <main class="app-main">
+                <div class="card"><h2 class="text-xl font-bold mb-4">Create New Executive</h2><form id="add-exec-form" onsubmit="event.preventDefault(); addUser('executive');" class="space-y-4"><input id="new-exec-username" class="form-input" placeholder="Enter Username" required /><input id="new-exec-pass" class="form-input" placeholder="Enter Password" type="password" required /><button type="submit" class="btn-primary"><span class="material-symbols-outlined">add</span>Create Executive</button></form></div>
+                <div class="card space-y-3"><h2 class="text-xl font-bold">Executive List</h2><div id="executives-list"></div></div>
+            </main>
+        </div>
+
+        <div id="admin-admin-management-screen" class="admin-screen" style="display: none;">
+            <header class="app-header"><div class="app-header-content"><button class="absolute left-4 text-[var(--text-secondary)] hover:text-[var(--primary-color)]" onclick="showAdminScreen('admin-dashboard-screen')"><span class="material-symbols-outlined">arrow_back_ios_new</span></button><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Admin Management</h1></div></header>
+            <main class="app-main">
+                <div class="card"><h2 class="text-xl font-bold mb-4">Create New Admin</h2><form id="add-admin-form" onsubmit="event.preventDefault(); addUser('admin');" class="space-y-4"><input id="new-admin-username" class="form-input" placeholder="Enter Username" required /><input id="new-admin-pass" class="form-input" placeholder="Enter Password" type="password" required /><button type="submit" class="btn-primary"><span class="material-symbols-outlined">add</span>Create Admin</button></form></div>
+                <div class="card space-y-3"><h2 class="text-xl font-bold">Admin List</h2><div id="admins-list"></div></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- EXECUTIVE SCREENS (WITH DYNAMIC HEADER & BOTTOM NAV)                -->
+    <!-- =================================================================== -->
+    <div id="executive-screens" class="screen">
+        <header class="app-header">
+            <div class="app-header-content">
+                <h1 id="executive-header-title" class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Job Card</h1>
+                <button onclick="logout()" class="absolute right-4 flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--primary-color)]">
+                    <span class="font-medium text-sm hidden sm:block">Logout</span>
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="job-card-screen" class="executive-screen active-executive-screen">
+             <main class="app-main">
+                <div class="card"><h2 class="text-xl font-bold mb-4">Find Vehicle</h2><div class="flex flex-col sm:flex-row gap-3"><input id="search-vehicle-number" type="text" placeholder="Enter Vehicle Number (e.g., MH12AB1234)" class="form-input flex-grow"><button onclick="searchVehicle()" class="btn-primary"><span class="material-symbols-outlined">search</span>Search</button></div><p id="search-error" class="text-red-500 text-sm mt-2 hidden"></p></div>
+                <div id="vehicle-details-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Vehicle Found</h2><div class="grid grid-cols-2 gap-4 text-base border-t pt-4"><div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="detail-vehicle-number" class="font-bold text-lg"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Brand</p><p id="detail-brand" class="font-semibold"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Model</p><p id="detail-model" class="font-semibold"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Fuel Type</p><p id="detail-fuel-type" class="font-semibold"></p></div><div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Odometer Reading</p><p id="detail-odometer" class="font-semibold"></p></div></div></div>
+                <div id="create-vehicle-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-orange-600"><span class="material-symbols-outlined">add_circle</span> Register New Vehicle</h2><form id="create-vehicle-form" onsubmit="event.preventDefault(); createVehicle();" class="border-t pt-4"><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label class="form-label">Vehicle Number</label><input id="new-vehicle-number" type="text" class="form-input bg-gray-100" readonly></div><div><label class="form-label">Brand</label><select id="new-vehicle-brand-exec" class="form-input" required onchange="populateModelDropdown()"></select></div><div><label class="form-label">Model</label><select id="new-vehicle-model-exec" class="form-input" required></select></div><div><label class="form-label">Fuel Type</label><select id="new-fuel-type" class="form-input" required><option value="">Select Type</option><option>Petrol</option><option>Diesel</option></select></div><div class="sm:col-span-2"><label class="form-label">Odometer Reading (km)</label><input id="new-odometer" type="number" class="form-input" placeholder="e.g., 54000" required></div></div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">save</span>Save Vehicle</button></div></form></div>
+                <div id="new-complaint-section" class="card hidden"><h2 class="text-xl font-bold mb-4">Register New Complaint</h2><form onsubmit="event.preventDefault(); saveComplaint();" class="border-t pt-4"><div><label for="complaint-description" class="form-label">Describe the issue in detail</label><textarea id="complaint-description" rows="5" class="form-input" placeholder="e.g., Engine is making a strange noise on startup..." required></textarea></div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">add_task</span>Save Complaint</button></div></form></div>
+            </main>
+        </div>
+
+        <div id="vehicle-update-screen" class="executive-screen" style="display: none;">
+             <main class="app-main">
+                <div class="card relative"><h2 class="text-xl font-bold mb-4">Search Report to Update</h2><input id="update-search-input" onkeyup="handleReportUpdateSearch()" type="text" placeholder="Start typing vehicle number..." class="form-input"><div id="prediction-list" class="absolute top-full left-5 right-5 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden"></div></div>
+                <div id="update-details-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Selected Report</h2><div class="grid grid-cols-2 gap-4 text-base border-t pt-4"><div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="update-detail-number" class="font-bold text-lg"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Complaint</p><p id="update-detail-complaint" class="font-semibold"></p></div></div></div>
+                <div id="update-form-section" class="card hidden">
+                    <form onsubmit="event.preventDefault(); saveVehicleUpdate();" class="space-y-6">
+                        <div><label class="form-label">Suggested Repair (from Executive)</label><div class="flex items-center gap-2"><input id="suggestion-input" type="text" class="form-input flex-grow" placeholder="e.g., Change engine oil"><button type="button" onclick="addSuggestion()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200"><span class="material-symbols-outlined">add</span></button></div><div id="executive-suggestions-list" class="mt-3 space-y-2"></div></div>
+                        <div><h3 class="text-base font-bold mb-2 border-t pt-4">Customer Approved Suggestions</h3><div id="customer-approval-list" class="space-y-2"><p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p></div></div>
+                        <div><label for="delivery-date" class="form-label border-t pt-4">Expected Delivery Date</label><input id="delivery-date" type="date" class="form-input" required></div>
+                        <div class="pt-2"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">save</span>Save Update</button></div>
+                    </form>
+                </div>
+             </main>
+        </div>
+        
+        <div id="report-screen" class="executive-screen" style="display: none;">
+            <main class="app-main">
+                <div class="card">
+                    <h2 class="text-xl font-bold mb-4">Filter Reports</h2>
+                    <div id="report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
+                        <input type="date" id="filter-date" class="form-input" oninput="applyReportFilters()">
+                        <input type="month" id="filter-month" class="form-input" oninput="applyReportFilters()">
+                        <input type="text" id="filter-vehicle-no" class="form-input" placeholder="Vehicle Number" oninput="applyReportFilters()">
+                        <input type="text" id="filter-brand" class="form-input" placeholder="Brand" oninput="applyReportFilters()">
+                        <input type="text" id="filter-exec-name" class="form-input" placeholder="Executive Name" oninput="applyReportFilters()">
+                        <button onclick="clearReportFilters()" class="text-sm h-11 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300">Clear Filters</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2 class="text-xl font-bold mb-4">Service History</h2>
+                    <div class="table-container"><div class="table-scroll"><table class="report-table">
+                        <thead><tr><th>Vehicle No.</th><th>Model</th><th>Brand</th><th>Executive</th><th>Date & Time</th><th>Status</th></tr></thead>
+                        <tbody id="report-table-body"></tbody>
+                    </table></div></div>
+                    <p id="no-reports-message" class="text-center text-gray-500 py-8 hidden">No reports found matching your criteria.</p>
+                </div>
+            </main>
+        </div>
+        <div id="due-date-screen" class="executive-screen" style="display: none;">
+            <main class="app-main">
+                <div id="due-date-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Due date cards will be inserted here -->
+                </div>
+                <p id="no-due-dates-message" class="text-center text-gray-500 py-8 hidden">No upcoming due dates found.</p>
+            </main>
+        </div>
+        <div id="profile-screen" class="executive-screen" style="display: none;">
+            <main class="app-main">
+                <div class="card">
+                    <div class="flex flex-col items-center">
+                        <div class="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center mb-4"><span class="material-symbols-outlined text-6xl text-blue-600">person</span></div>
+                        <h2 id="profile-username" class="text-2xl font-bold"></h2>
+                        <p id="profile-role" class="text-[var(--text-secondary)] capitalize"></p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2 class="text-xl font-bold mb-4">Reset Password</h2>
+                    <form onsubmit="event.preventDefault(); resetPassword();" class="space-y-4 border-t pt-4">
+                        <div><label class="form-label">Current Password</label><input id="current-password" type="password" class="form-input" required></div>
+                        <div><label class="form-label">New Password</label><input id="new-password" type="password" class="form-input" required></div>
+                        <div><label class="form-label">Confirm New Password</label><input id="confirm-new-password" type="password" class="form-input" required></div>
+                        <div class="pt-2"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">lock_reset</span>Reset Password</button></div>
+                    </form>
+                </div>
+                 <div class="card">
+                    <button onclick="logout()" class="w-full flex justify-center items-center gap-2 text-red-600 font-bold py-3 px-4 rounded-lg hover:bg-red-50"><span class="material-symbols-outlined">logout</span>Logout</button>
+                 </div>
+            </main>
+        </div>
+
+        <footer class="bottom-nav">
+             <div class="max-w-5xl mx-auto flex justify-around">
+                <a href="javascript:void(0)" class="nav-item active" data-target="job-card-screen" onclick="showExecutiveScreen('job-card-screen')"><span class="material-symbols-outlined">description</span><span>Job Card</span></a>
+                <a href="javascript:void(0)" class="nav-item" data-target="vehicle-update-screen" onclick="showExecutiveScreen('vehicle-update-screen')"><span class="material-symbols-outlined">update</span><span>Update</span></a>
+                <a href="javascript:void(0)" class="nav-item" data-target="report-screen" onclick="showExecutiveScreen('report-screen')"><span class="material-symbols-outlined">assessment</span><span>Report</span></a>
+                <a href="javascript:void(0)" class="nav-item" data-target="due-date-screen" onclick="showExecutiveScreen('due-date-screen')"><span class="material-symbols-outlined">event_available</span><span>Due Date</span></a>
+                <a href="javascript:void(0)" class="nav-item" data-target="profile-screen" onclick="showExecutiveScreen('profile-screen')"><span class="material-symbols-outlined">person</span><span>Profile</span></a>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- MODALS & GLOBAL ELEMENTS -->
+    <div id="success-message" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg hidden flex items-center gap-2 transition-transform duration-300 transform"><span class="material-symbols-outlined">check_circle</span><span id="success-text"></span></div>
+    <div id="error-message" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg hidden flex items-center gap-2 transition-transform duration-300 transform"><span class="material-symbols-outlined">error</span><span id="error-text"></span></div>
+
+    <div id="delete-confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-hidden"><div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div><div class="relative bg-white rounded-lg p-6 w-full max-w-sm m-4 space-y-4"><h3 class="text-xl font-bold text-gray-800">Confirm Deletion</h3><p id="delete-modal-text" class="text-gray-600"></p><div class="flex justify-end gap-4 pt-4"><button onclick="hideModal('delete-confirmation-modal')" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold">Cancel</button><button id="confirm-delete-button" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Confirm Delete</button></div></div></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const { createClient } = supabase;
+        // IMPORTANT: Replace with your actual Supabase project URL and anon key
+        const supabaseUrl = 'https://gfylsjfljnwyomfouwvs.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmeWxzamZsam53eW9tZm91d3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0MDc5MTYsImV4cCI6MjA3Mjk4MzkxNn0.hMvLvCDVaFtq0rXToHGOJPSFe-QnJ6_S-MYsI0d5zOs';
+        const sb = createClient(supabaseUrl, supabaseKey);
+
+        // --- GLOBAL STATE ---
+        let currentUser = null;
+        let vehicleModelsCache = [];
+        let currentVehicleId = null;
+        let currentReportId = null;
+        let currentSuggestions = [];
+        
+        // --- UI ELEMENT REFERENCES ---
+        const vehicleDetailsSection = document.getElementById('vehicle-details-section'), createVehicleSection = document.getElementById('create-vehicle-section'), newComplaintSection = document.getElementById('new-complaint-section'), searchError = document.getElementById('search-error');
+        const predictionList = document.getElementById('prediction-list'), updateDetailsSection = document.getElementById('update-details-section'), updateFormSection = document.getElementById('update-form-section');
+
+        // --- AUTHENTICATION ---
+        async function login(role) {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            if (!username || !password) return showError('Username and password are required.');
+
+            const { data, error } = await sb
+                .from('users')
+                .select('*')
+                .eq('username', username)
+                .eq('password', password)
+                .eq('role', role)
+                .single();
+
+            if (error || !data) return showError('Invalid credentials or role mismatch.');
+            
+            currentUser = data;
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser)); // Persist user session
+            
+            if (role === 'admin') {
+                showAdminScreen('admin-dashboard-screen');
+            } else {
+                document.getElementById('profile-username').textContent = currentUser.username;
+                document.getElementById('profile-role').textContent = currentUser.role;
+                showExecutiveScreen('job-card-screen');
+            }
+            showSuccessMessage(`Welcome, ${currentUser.username}!`);
+        }
+
+        function logout() {
+            currentUser = null;
+            sessionStorage.removeItem('currentUser');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            showScreen('login-screen');
+            resetVehicleUpdateScreen();
+            resetJobCardState();
+        }
+
+        // --- ADMIN: VEHICLE MANAGEMENT ---
+        async function renderVehicleModelList() {
+            const { data, error } = await sb.from('vehicle_models').select('*').order('brand');
+            if (error) return showError('Could not fetch vehicle models.');
+            
+            vehicleModelsCache = data; // Cache for other functions
+            const list = document.getElementById('vehicle-models-list');
+            list.innerHTML = '';
+            if (data.length === 0) {
+                list.innerHTML = `<p class="text-sm text-gray-500">No vehicle models created yet.</p>`;
+                return;
+            }
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-lg';
+                div.innerHTML = `<p class="font-semibold">${item.brand} - ${item.model}</p><button onclick="confirmDeletion('vehicle_model', ${item.id})" class="text-red-500 hover:text-red-700"><span class="material-symbols-outlined">delete</span></button>`;
+                list.appendChild(div);
+            });
+        }
+        
+        async function addVehicleModel() {
+            const brand = document.getElementById('new-brand-admin').value.trim();
+            const model = document.getElementById('new-model-admin').value.trim();
+            if (!brand || !model) return showError('Brand and model are required.');
+
+            const { error } = await sb.from('vehicle_models').insert({ brand, model });
+            if (error) return showError(`Could not add model: ${error.message}`);
+            
+            document.getElementById('add-vehicle-model-form').reset();
+            showSuccessMessage("Vehicle model added.");
+            renderVehicleModelList();
+        }
+
+        // --- ADMIN: USER MANAGEMENT ---
+        async function renderUserList(role) {
+            const listId = role === 'admin' ? 'admins-list' : 'executives-list';
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+
+            const { data, error } = await sb.from('users').select('id, username').eq('role', role);
+            if(error) return showError(`Could not fetch ${role}s.`);
+            
+            data.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-lg';
+                div.innerHTML = `<p class="font-semibold">${user.username}</p><button onclick="confirmDeletion('user', ${user.id}, '${role}')" class="text-red-500 hover:text-red-700"><span class="material-symbols-outlined">delete</span></button>`;
+                list.appendChild(div);
+            });
+        }
+
+        async function addUser(role) {
+            const usernameInputId = role === 'admin' ? 'new-admin-username' : 'new-exec-username';
+            const passwordInputId = role === 'admin' ? 'new-admin-pass' : 'new-exec-pass';
+            const formId = role === 'admin' ? 'add-admin-form' : 'add-exec-form';
+
+            const username = document.getElementById(usernameInputId).value.trim();
+            const password = document.getElementById(passwordInputId).value.trim();
+
+            if(!username || !password) return showError('Username and password are required.');
+
+            const { error } = await sb.from('users').insert({ username, password, role });
+            if(error) return showError(`Could not create ${role}: ${error.message}`);
+            
+            showSuccessMessage(`${role.charAt(0).toUpperCase() + role.slice(1)} created.`);
+            document.getElementById(formId).reset();
+            renderUserList(role);
+        }
+
+        // --- ADMIN & EXECUTIVE: REPORTS ---
+        async function fetchAndPopulateReports(isAdmin = false) {
+            const tableBodyId = isAdmin ? 'admin-report-table-body' : 'report-table-body';
+            const noReportsMsgId = isAdmin ? 'admin-no-reports-message' : 'no-reports-message';
+            const date = document.getElementById(isAdmin ? 'admin-filter-date' : 'filter-date').value;
+            const month = document.getElementById(isAdmin ? 'admin-filter-month' : 'filter-month').value;
+            const vehicleNo = document.getElementById(isAdmin ? 'admin-filter-vehicle-no' : 'filter-vehicle-no').value.toUpperCase();
+            const brand = document.getElementById(isAdmin ? 'admin-filter-brand' : 'filter-brand').value;
+            const execName = document.getElementById(isAdmin ? 'admin-filter-exec-name' : 'filter-exec-name').value;
+            
+            let query = sb.from('reports').select(`
+                *,
+                vehicles ( vehicle_no, vehicle_models ( brand, model ) ),
+                users ( username )
+            `).order('created_at', { ascending: false });
+
+            // Apply filters
+            if(date) query = query.like('created_at', `${date}%`);
+            if(month) query = query.like('created_at', `${month}%`);
+            if(vehicleNo) query = query.ilike('vehicles.vehicle_no', `%${vehicleNo}%`);
+            if(brand) query = query.ilike('vehicles.vehicle_models.brand', `%${brand}%`);
+            if(execName) query = query.ilike('users.username', `%${execName}%`);
+
+            const { data, error } = await query;
+            if(error) return showError('Failed to fetch reports.');
+
+            const tableBody = document.getElementById(tableBodyId);
+            const noReportsMsg = document.getElementById(noReportsMsgId);
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                noReportsMsg.classList.remove('hidden');
+                return;
+            }
+            noReportsMsg.classList.add('hidden');
+            
+            const statusColors = { 'Completed': 'bg-green-100 text-green-800', 'Ongoing': 'bg-orange-100 text-orange-800', 'Not Started': 'bg-red-100 text-red-800' };
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.vehicles.vehicle_no}</td>
+                    <td>${row.vehicles.vehicle_models.model}</td>
+                    <td>${row.vehicles.vehicle_models.brand}</td>
+                    <td>${row.users.username}</td>
+                    <td>${new Date(row.created_at).toLocaleString()}</td>
+                    <td><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[row.status] || 'bg-gray-100 text-gray-800'}">${row.status}</span></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+        
+        function applyAdminReportFilters() { fetchAndPopulateReports(true); }
+        function clearAdminReportFilters() { document.getElementById('admin-report-filters').querySelectorAll('input').forEach(input => input.value = ''); fetchAndPopulateReports(true); }
+        function applyReportFilters() { fetchAndPopulateReports(false); }
+        function clearReportFilters() { document.getElementById('report-filters').querySelectorAll('input').forEach(input => input.value = ''); fetchAndPopulateReports(false); }
+
+        // --- ADMIN: ANALYTICS ---
+        async function renderAnalytics() {
+            const month = document.getElementById('analytics-month-filter').value;
+            const executiveId = document.getElementById('analytics-exec-filter').value;
+            const executiveName = document.getElementById('analytics-exec-filter').selectedOptions[0].text;
+
+            let query = sb.from('reports').select('status');
+            if(month) query = query.like('created_at', `${month}%`);
+            if(executiveId) query = query.eq('executive_id', executiveId);
+
+            const { data, error } = await query;
+            if(error) return showError('Failed to get analytics data.');
+            
+            const completed = data.filter(r => r.status === 'Completed').length;
+            const pending = data.length - completed;
+            const total = data.length;
+            const completedPercent = total > 0 ? (completed / total * 100).toFixed(1) : 0;
+            const pendingPercent = total > 0 ? (pending / total * 100).toFixed(1) : 0;
+
+            const chartDiv = document.getElementById('analytics-chart');
+            chartDiv.innerHTML = `
+                <div><div class="flex justify-between text-sm mb-1"><span class="font-medium text-green-600">Completed (${completed})</span><span>${completedPercent}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="bg-green-500 h-3 rounded-full" style="width: ${completedPercent}%"></div></div></div>
+                <div><div class="flex justify-between text-sm mb-1"><span class="font-medium text-orange-600">Pending/Ongoing (${pending})</span><span>${pendingPercent}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="bg-orange-500 h-3 rounded-full" style="width: ${pendingPercent}%"></div></div></div>`;
+            document.getElementById('analytics-title').textContent = `${executiveId ? executiveName : 'Overall'} Status for ${month ? new Date(month + '-02').toLocaleString('default', { month: 'long', year: 'numeric' }) : 'All Time'}`;
+        }
+
+        async function populateAnalyticsFilters() {
+            // Populate executives
+            const { data: execs, error: execsError } = await sb.from('users').select('id, username').eq('role', 'executive');
+            if(execsError) return showError('Could not load executives.');
+            const execFilter = document.getElementById('analytics-exec-filter');
+            execFilter.innerHTML = '<option value="">All Executives</option>';
+            execs.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.textContent = e.username;
+                execFilter.appendChild(opt);
+            });
+
+            // Populate months
+            const { data: reports, error: reportsError } = await sb.from('reports').select('created_at');
+            if(reportsError) return showError('Could not load report dates.');
+            const monthFilter = document.getElementById('analytics-month-filter');
+            const months = [...new Set(reports.map(r => r.created_at.substring(0, 7)))];
+            monthFilter.innerHTML = '<option value="">All Months</option>';
+            months.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = new Date(m + '-02').toLocaleString('default', { month: 'long', year: 'numeric' });
+                monthFilter.appendChild(opt);
+            });
+        }
+
+        // --- EXECUTIVE: JOB CARD ---
+        async function populateExecutiveVehicleDropdowns() {
+            if (vehicleModelsCache.length === 0) { // Fetch if cache is empty
+                const { data, error } = await sb.from('vehicle_models').select('*');
+                if (error) return showError('Could not fetch vehicle models.');
+                vehicleModelsCache = data;
+            }
+            
+            const brandSelect = document.getElementById('new-vehicle-brand-exec');
+            brandSelect.innerHTML = '<option value="">Select Brand</option>';
+            
+            const uniqueBrands = [...new Set(vehicleModelsCache.map(item => item.brand))];
+            uniqueBrands.forEach(brand => {
+                const opt = document.createElement('option');
+                opt.value = brand;
+                opt.textContent = brand;
+                brandSelect.appendChild(opt);
+            });
+            populateModelDropdown();
+        }
+
+        function populateModelDropdown() {
+            const brand = document.getElementById('new-vehicle-brand-exec').value;
+            const modelSelect = document.getElementById('new-vehicle-model-exec');
+            modelSelect.innerHTML = '<option value="">Select Model</option>';
+
+            const modelsForBrand = vehicleModelsCache.filter(item => item.brand === brand);
+            modelsForBrand.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id; // Use model ID as value
+                opt.textContent = item.model;
+                modelSelect.appendChild(opt);
+            });
+        }
+        
+        async function searchVehicle() {
+            const vehicleNumber = document.getElementById('search-vehicle-number').value.trim().toUpperCase();
+            hideAllSections();
+            if (!vehicleNumber) {
+                showError('Please enter a vehicle number.');
+                return;
+            }
+
+            const { data, error } = await sb
+                .from('vehicles')
+                .select(`id, vehicle_no, fuel_type, odometer, vehicle_models ( brand, model )`)
+                .eq('vehicle_no', vehicleNumber)
+                .single();
+
+            if (data) { // Vehicle exists
+                currentVehicleId = data.id;
+                document.getElementById('detail-vehicle-number').textContent = data.vehicle_no;
+                document.getElementById('detail-brand').textContent = data.vehicle_models.brand;
+                document.getElementById('detail-model').textContent = data.vehicle_models.model;
+                document.getElementById('detail-fuel-type').textContent = data.fuel_type;
+                document.getElementById('detail-odometer').textContent = data.odometer + ' km';
+                vehicleDetailsSection.classList.remove('hidden');
+                newComplaintSection.classList.remove('hidden');
+            } else { // New vehicle
+                currentVehicleId = null;
+                document.getElementById('new-vehicle-number').value = vehicleNumber;
+                populateExecutiveVehicleDropdowns();
+                createVehicleSection.classList.remove('hidden');
+            }
+        }
+
+        async function createVehicle() {
+            const newVehicle = {
+                vehicle_no: document.getElementById('new-vehicle-number').value,
+                model_id: document.getElementById('new-vehicle-model-exec').value,
+                fuel_type: document.getElementById('new-fuel-type').value,
+                odometer: document.getElementById('new-odometer').value
+            };
+            if (!newVehicle.model_id || !newVehicle.fuel_type || !newVehicle.odometer) {
+                return showError('Please fill all vehicle details.');
+            }
+
+            const { data, error } = await sb.from('vehicles').insert(newVehicle).select().single();
+            if (error) return showError(`Failed to create vehicle: ${error.message}`);
+            
+            currentVehicleId = data.id;
+            document.getElementById('create-vehicle-form').reset();
+            createVehicleSection.classList.add('hidden');
+            showSuccessMessage('Vehicle created successfully!');
+            searchVehicle(); // Re-run search to show details
+        }
+        
+        async function saveComplaint() {
+            const complaint = document.getElementById('complaint-description').value.trim();
+            if (!complaint) return showError('Complaint description is required.');
+            if (!currentVehicleId) return showError('No vehicle selected.');
+
+            const newReport = {
+                vehicle_id: currentVehicleId,
+                executive_id: currentUser.id,
+                complaint: complaint,
+                status: 'Not Started'
+            };
+
+            const { error } = await sb.from('reports').insert(newReport);
+            if(error) return showError(`Failed to save complaint: ${error.message}`);
+            
+            showSuccessMessage('Complaint saved successfully!');
+            resetJobCardState();
+        }
+
+        // --- EXECUTIVE: UPDATE VEHICLE ---
+        async function handleReportUpdateSearch() {
+            const input = document.getElementById('update-search-input').value.trim().toUpperCase();
+            predictionList.innerHTML = '';
+            if (!input) {
+                predictionList.classList.add('hidden');
+                return;
+            }
+
+            // Step 1: Find vehicle IDs that match the search input.
+            const { data: vehiclesData, error: vehiclesError } = await sb
+                .from('vehicles')
+                .select('id')
+                .ilike('vehicle_no', `%${input}%`);
+
+            if (vehiclesError || !vehiclesData || vehiclesData.length === 0) {
+                predictionList.classList.add('hidden');
+                return;
+            }
+
+            const vehicleIds = vehiclesData.map(v => v.id);
+
+            // Step 2: Use the found vehicle IDs to find their corresponding reports that are not 'Completed'.
+            const { data, error } = await sb
+                .from('reports')
+                .select(`id, complaint, vehicles(vehicle_no)`)
+                .in('vehicle_id', vehicleIds)
+                .neq('status', 'Completed')
+                .limit(5);
+            
+            if (error || !data || data.length === 0) {
+                predictionList.classList.add('hidden');
+                return;
+            }
+            
+            data.forEach(report => {
+                const item = document.createElement('div');
+                item.className = 'p-3 hover:bg-gray-100 cursor-pointer';
+                item.textContent = `${report.vehicles.vehicle_no} - ${report.complaint}`;
+                item.onclick = () => selectReportForUpdate(report);
+                predictionList.appendChild(item);
+            });
+            predictionList.classList.remove('hidden');
+        }
+
+        function selectReportForUpdate(report) {
+            currentReportId = report.id;
+            document.getElementById('update-search-input').value = report.vehicles.vehicle_no;
+            predictionList.classList.add('hidden');
+            document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
+            document.getElementById('update-detail-complaint').textContent = report.complaint;
+            updateDetailsSection.classList.remove('hidden');
+            updateFormSection.classList.remove('hidden');
+            currentSuggestions = [];
+            renderSuggestions();
+        }
+
+        function addSuggestion() {
+            const input = document.getElementById('suggestion-input');
+            const suggestionText = input.value.trim();
+            if (suggestionText) {
+                currentSuggestions.push(suggestionText);
+                input.value = '';
+                renderSuggestions();
+            }
+        }
+
+        function renderSuggestions() {
+            const executiveList = document.getElementById('executive-suggestions-list');
+            const customerList = document.getElementById('customer-approval-list');
+            executiveList.innerHTML = '';
+            customerList.innerHTML = '';
+
+            if (currentSuggestions.length === 0) {
+                customerList.innerHTML = '<p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p>';
+                return;
+            }
+            currentSuggestions.forEach(text => {
+                const execItem = document.createElement('div');
+                execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
+                execItem.textContent = text;
+                executiveList.appendChild(execItem);
+                
+                const customerItem = document.createElement('label');
+                customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
+                customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
+                customerList.appendChild(customerItem);
+            });
+        }
+        
+        async function saveVehicleUpdate() {
+            if(!currentReportId) return showError('No report selected for update.');
+
+            const deliveryDate = document.getElementById('delivery-date').value;
+            if(!deliveryDate) return showError('Please select an expected delivery date.');
+
+            const approvedItems = [];
+            document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
+                approvedItems.push(checkbox.nextElementSibling.textContent);
+            });
+
+            const updateData = {
+                suggested: JSON.stringify(currentSuggestions),
+                approved: JSON.stringify(approvedItems),
+                expected_delivery: deliveryDate,
+                status: 'Ongoing'
+            };
+
+            const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
+            if(error) return showError(`Failed to save update: ${error.message}`);
+            
+            showSuccessMessage('Update saved successfully!');
+            resetVehicleUpdateScreen();
+        }
+
+        // --- EXECUTIVE: DUE DATES ---
+        async function populateDueDateScreen() {
+            const listContainer = document.getElementById('due-date-list');
+            const noDatesMsg = document.getElementById('no-due-dates-message');
+            listContainer.innerHTML = '';
+
+            const { data, error } = await sb.from('reports')
+                .select(`id, complaint, expected_delivery, status, vehicles(vehicle_no)`)
+                .in('status', ['Not Started', 'Ongoing'])
+                .order('expected_delivery');
+            
+            if(error) return showError('Could not fetch due dates.');
+            if (data.length === 0) {
+                noDatesMsg.classList.remove('hidden');
+                return;
+            }
+            noDatesMsg.classList.add('hidden');
+
+            const statusOptions = ['Not Started', 'Ongoing', 'Completed'];
+            data.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'card space-y-3';
+                let optionsHtml = statusOptions.map(opt => `<option value="${opt}" ${job.status === opt ? 'selected' : ''}>${opt}</option>`).join('');
+                card.innerHTML = `
+                    <div><p class="font-bold text-lg">${job.vehicles.vehicle_no}</p><p class="text-sm text-gray-500">${job.complaint}</p></div>
+                    <div class="border-t pt-3"><p class="text-sm font-medium">Due: <span class="font-bold text-blue-600">${job.expected_delivery || 'Not set'}</span></p></div>
+                    <div class="flex items-center gap-2"><label class="text-sm font-medium">Status:</label><select onchange="updateJobStatus(${job.id}, this.value, '${job.vehicles.vehicle_no}')" class="form-input text-sm !py-1 !px-2 w-auto">${optionsHtml}</select></div>`;
+                listContainer.appendChild(card);
+            });
+        }
+        
+        async function updateJobStatus(id, newStatus, vehicleNo) {
+            const { error } = await sb.from('reports').update({ status: newStatus }).eq('id', id);
+            if(error) return showError('Failed to update status.');
+
+            showSuccessMessage(`Status for ${vehicleNo} updated to ${newStatus}`);
+            populateDueDateScreen();
+        }
+        
+        // --- EXECUTIVE: PROFILE ---
+        async function resetPassword() {
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmNewPassword = document.getElementById('confirm-new-password').value;
+
+            if (newPassword !== confirmNewPassword) return showError('New passwords do not match.');
+            if (currentUser.password !== currentPassword) return showError('Incorrect current password.');
+
+            const { error } = await sb.from('users').update({ password: newPassword }).eq('id', currentUser.id);
+            if (error) return showError('Could not reset password.');
+
+            showSuccessMessage('Password reset successfully!');
+            currentUser.password = newPassword; // Update local state
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+            document.querySelector('#profile-screen form').reset();
+        }
+
+        // --- DELETION LOGIC ---
+        function confirmDeletion(type, id, role) {
+            const modal = document.getElementById('delete-confirmation-modal');
+            const text = document.getElementById('delete-modal-text');
+            const button = document.getElementById('confirm-delete-button');
+            
+            let message = '';
+            if (type === 'user') message = `Are you sure you want to delete this ${role}? This action cannot be undone.`;
+            else if (type === 'vehicle_model') message = `Are you sure you want to delete this vehicle model? This may affect existing records.`;
+            
+            text.textContent = message;
+            button.onclick = () => executeDelete(type, id, role);
+            showModal('delete-confirmation-modal');
+        }
+
+        async function executeDelete(type, id, role) {
+            let error;
+            if (type === 'user') {
+                ({ error } = await sb.from('users').delete().eq('id', id));
+            } else if (type === 'vehicle_model') {
+                ({ error } = await sb.from('vehicle_models').delete().eq('id', id));
+            }
+
+            hideModal('delete-confirmation-modal');
+            if(error) return showError(`Deletion failed: ${error.message}`);
+
+            showSuccessMessage('Item deleted successfully.');
+            // Refresh the relevant list
+            if (type === 'user') renderUserList(role);
+            if (type === 'vehicle_model') renderVehicleModelList();
+        }
+
+        // --- UTILITY & UI FUNCTIONS ---
+        function hideAllSections() {
+            vehicleDetailsSection.classList.add('hidden');
+            createVehicleSection.classList.add('hidden');
+            newComplaintSection.classList.add('hidden');
+            searchError.classList.add('hidden');
+        }
+
+        function resetJobCardState() {
+            hideAllSections();
+            document.getElementById('search-vehicle-number').value = '';
+            document.getElementById('complaint-description').value = '';
+            document.getElementById('create-vehicle-form').reset();
+            currentVehicleId = null;
+        }
+
+        function resetVehicleUpdateScreen() {
+            document.getElementById('update-search-input').value = '';
+            predictionList.classList.add('hidden');
+            updateDetailsSection.classList.add('hidden');
+            updateFormSection.classList.add('hidden');
+            document.getElementById('delivery-date').value = '';
+            currentSuggestions = [];
+            currentReportId = null;
+            renderSuggestions();
+        }
+
+        function showScreen(screenId) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen')); document.getElementById(screenId).classList.add('active-screen'); }
+        
+        function showAdminScreen(screenId) {
+            document.querySelectorAll('#admin-screens .admin-screen').forEach(s => s.style.display = 'none');
+            document.getElementById(screenId).style.display = 'block';
+            
+            // Fetch data for the specific admin screen
+            if (screenId === 'admin-vehicle-management-screen') renderVehicleModelList();
+            if (screenId === 'admin-reports-screen') fetchAndPopulateReports(true);
+            if (screenId === 'admin-analytics-screen') { populateAnalyticsFilters(); renderAnalytics(); }
+            if (screenId === 'admin-executive-management-screen') renderUserList('executive');
+            if (screenId === 'admin-admin-management-screen') renderUserList('admin');
+            
+            showScreen('admin-screens');
+        }
+
+        function showExecutiveScreen(screenId) {
+            document.querySelectorAll('#executive-screens .executive-screen').forEach(s => s.style.display = 'none');
+            document.getElementById(screenId).style.display = 'block';
+            setActiveNav(screenId);
+            
+            // Fetch data for the specific executive screen
+            if (screenId === 'report-screen') fetchAndPopulateReports(false);
+            if (screenId === 'due-date-screen') populateDueDateScreen();
+            if (screenId === 'job-card-screen') resetJobCardState();
+            // No action needed for vehicle-update-screen on entry, it preserves its state.
+            // The reset function is called after a successful update or on logout.
+
+            showScreen('executive-screens');
+        }
+
+        function setActiveNav(targetId) {
+            const headerTitle = document.getElementById('executive-header-title');
+            document.querySelectorAll('.nav-item').forEach(item => {
+                const isActive = item.dataset.target === targetId;
+                item.classList.toggle('active', isActive);
+                if (isActive) {
+                    headerTitle.textContent = item.querySelector('span:last-child').textContent;
+                }
+            });
+        }
+        
+        function showModal(id) { document.getElementById(id)?.classList.remove('modal-hidden'); }
+        function hideModal(id) { document.getElementById(id)?.classList.add('modal-hidden'); }
+        
+        function showSuccessMessage(message) {
+            const el = document.getElementById('success-message');
+            document.getElementById('success-text').textContent = message;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        function showError(message) {
+            const el = document.getElementById('error-message');
+            document.getElementById('error-text').textContent = message;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+
+        // --- INITIALIZATION ---
+        // Check for a logged-in user on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedUser = sessionStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                if (currentUser.role === 'admin') {
+                    showAdminScreen('admin-dashboard-screen');
+                } else if (currentUser.role === 'executive') {
+                    document.getElementById('profile-username').textContent = currentUser.username;
+                    document.getElementById('profile-role').textContent = currentUser.role;
+                    showExecutiveScreen('job-card-screen');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
