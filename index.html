@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AutoFix Application</title>
 
-    <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-    <link rel="manifest" href="/manifest.json">
-
-    <!-- Tailwind CSS -->
+<link rel="manifest" href="manifest.json" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     
-    <!-- Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Professional Blue & White Theme -->
     <style type="text/tailwindcss">
         :root {
             --primary-color: #2563eb; /* Blue 600 */
@@ -57,36 +52,61 @@
         .nav-item span { @apply text-xs font-medium; }
 
         /* Report Table Styles */
-        .table-container { @apply w-full overflow-hidden rounded-lg border border-[var(--border-color)]; }
-        .table-scroll { @apply w-full h-[60vh] overflow-auto; }
+        .table-container { @apply w-full overflow-auto rounded-lg border border-[var(--border-color)] max-h-[70vh]; }
         .report-table { @apply min-w-full divide-y divide-[var(--border-color)]; }
-        .report-table th { @apply sticky top-0 bg-gray-50 px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider z-10; }
+        .report-table th { @apply sticky top-0 bg-gray-50 px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider z-10 whitespace-nowrap; }
         .report-table td { @apply px-4 py-4 whitespace-nowrap text-sm; }
         .report-table tbody tr:nth-child(even) { @apply bg-white; }
         .report-table tbody tr:nth-child(odd) { @apply bg-gray-50; }
+        
+        /* Styles for the accordion list in Due Date page */
+        .due-date-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .due-date-item.expanded .due-date-details {
+            max-height: 500px; /* Large enough to fit content */
+        }
+        .due-date-item.expanded .due-date-header .material-symbols-outlined {
+            transform: rotate(180deg);
+        }
+		/* Styles for Printing */
+        .printable-area {
+            display: none;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .printable-area, .printable-area * {
+                visibility: visible;
+            }
+            .printable-area {
+                display: block;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- =================================================================== -->
-    <!-- Screen: Login (For Both Users)                                      -->
-    <!-- =================================================================== -->
     <div id="login-screen" class="screen active-screen">
         <div class="flex flex-col min-h-screen justify-center items-center p-4 bg-gray-50">
             <div class="w-full max-w-sm">
                 <div class="flex justify-center items-center gap-3 mb-8"><span class="material-symbols-outlined text-4xl text-[var(--primary-color)]">minor_crash</span><h1 class="text-3xl font-bold tracking-tight text-[var(--text-primary)]">AutoFix</h1></div>
                 <div class="card space-y-6">
-                    <div class="text-center"><h2 class="text-2xl font-bold text-gray-800">Welcome</h2><p class="text-[var(--text-secondary)] mt-1">Please select your role to sign in.</p></div>
-                    <form onsubmit="event.preventDefault();">
+                    <div class="text-center"><h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2><p class="text-[var(--text-secondary)] mt-1">Please sign in to your account.</p></div>
+                    <form onsubmit="event.preventDefault(); login();">
                         <div class="space-y-4">
                             <div><label for="username" class="form-label">Username</label><div class="relative"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">person</span><input class="form-input pl-10" id="username" placeholder="Enter your username" type="text" /></div></div>
                             <div><label for="password" class="form-label">Password</label><div class="relative"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">lock</span><input class="form-input pl-10" id="password" placeholder="Enter your password" type="password" /></div></div>
                         </div>
-                        <div class="mt-6 space-y-3">
-                            <button onclick="login('executive')" class="btn-primary">
-                              <span class="material-symbols-outlined">badge</span>Sign In as Executive
-                            </button>
-                            <button onclick="login('admin')" class="btn-secondary">
-                              <span class="material-symbols-outlined">admin_panel_settings</span>Sign In as Admin
+                        <div class="mt-6">
+                            <button type="submit" class="btn-primary">
+                              <span class="material-symbols-outlined">login</span>Sign In
                             </button>
                         </div>
                     </form>
@@ -95,16 +115,14 @@
         </div>
     </div>
 
-    <!-- =================================================================== -->
-    <!-- ADMIN SCREENS                                                       -->
-    <!-- =================================================================== -->
     <div id="admin-screens" class="screen">
         <div id="admin-dashboard-screen" class="admin-screen active-admin-screen">
              <header class="app-header"><div class="app-header-content"><h1 class="text-2xl font-bold text-[var(--primary-color)] flex-1 text-center">Admin Dashboard</h1><button onclick="logout()" class="absolute right-4 flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--primary-color)]"><span class="font-medium text-sm hidden sm:block">Logout</span><span class="material-symbols-outlined">logout</span></button></div></header>
             <main class="app-main grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-vehicle-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">minor_crash</span><h2 class="text-lg font-bold mt-2">Vehicle Management</h2><p class="text-sm text-[var(--text-secondary)]">Create & Delete Brands/Models</p></a>
-                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-reports-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">assessment</span><h2 class="text-lg font-bold mt-2">Reports</h2><p class="text-sm text-[var(--text-secondary)]">View & Filter All Reports</p></a>
+                
+                 <a href="javascript:void(0)" onclick="showAdminScreen('admin-reports-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">assessment</span><h2 class="text-lg font-bold mt-2">Reports & Service History</h2><p class="text-sm text-[var(--text-secondary)]">View & Filter All Reports</p></a>
                  <a href="javascript:void(0)" onclick="showAdminScreen('admin-analytics-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">monitoring</span><h2 class="text-lg font-bold mt-2">Analytics</h2><p class="text-sm text-[var(--text-secondary)]">View Complaint & Executive Stats</p></a>
+				  <a href="javascript:void(0)" onclick="showAdminScreen('admin-vehicle-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">minor_crash</span><h2 class="text-lg font-bold mt-2">Vehicle Management</h2><p class="text-sm text-[var(--text-secondary)]">Create & Delete Brands/Models</p></a>
                  <a href="javascript:void(0)" onclick="showAdminScreen('admin-executive-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">manage_accounts</span><h2 class="text-lg font-bold mt-2">Executive Management</h2><p class="text-sm text-[var(--text-secondary)]">Create & Delete Executives</p></a>
                  <a href="javascript:void(0)" onclick="showAdminScreen('admin-admin-management-screen')" class="card text-center items-center flex flex-col justify-center transition-all hover:shadow-xl hover:-translate-y-1"><span class="material-symbols-outlined text-5xl text-[var(--primary-color)]">admin_panel_settings</span><h2 class="text-lg font-bold mt-2">Admin Management</h2><p class="text-sm text-[var(--text-secondary)]">Manage Admins & Passwords</p></a>
             </main>
@@ -123,9 +141,16 @@
             <main class="app-main">
                 <div class="card">
                     <h2 class="text-xl font-bold mb-4">Filter Reports</h2>
-                    <div id="admin-report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
-                        <input type="date" id="admin-filter-date" class="form-input" oninput="applyAdminReportFilters()">
-                        <input type="month" id="admin-filter-month" class="form-input" oninput="applyAdminReportFilters()">
+                    <div id="admin-report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                        <div class="space-y-1">
+    <label for="admin-filter-from-date" class="text-xs font-medium text-gray-500">From Date</label>
+    <input type="date" id="admin-filter-from-date" class="form-input" onchange="handleDateChange('admin-filter-from-date', 'admin-filter-to-date'); applyAdminReportFilters();">
+</div>
+<div class="space-y-1">
+    <label for="admin-filter-to-date" class="text-xs font-medium text-gray-500">To Date</label>
+    <input type="date" id="admin-filter-to-date" class="form-input" onchange="handleDateChange('admin-filter-from-date', 'admin-filter-to-date'); applyAdminReportFilters();">
+</div>
+                        
                         <input type="text" id="admin-filter-vehicle-no" class="form-input" placeholder="Vehicle Number" oninput="applyAdminReportFilters()">
                         <input type="text" id="admin-filter-brand" class="form-input" placeholder="Brand" oninput="applyAdminReportFilters()">
                         <input type="text" id="admin-filter-exec-name" class="form-input" placeholder="Executive Name" oninput="applyAdminReportFilters()">
@@ -133,11 +158,39 @@
                     </div>
                 </div>
                 <div class="card">
-                    <h2 class="text-xl font-bold mb-4">Service History</h2>
-                    <div class="table-container"><div class="table-scroll"><table class="report-table">
-                        <thead><tr><th>Vehicle No.</th><th>Model</th><th>Brand</th><th>Executive</th><th>Date & Time</th><th>Status</th></tr></thead>
-                        <tbody id="admin-report-table-body"></tbody>
-                    </table></div></div>
+                    <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-bold">Service History</h2>
+    <button onclick="downloadReport()" class="flex items-center gap-1 px-3 py-1 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700">
+        <span class="material-symbols-outlined">download</span>
+        Download Report
+    </button>
+</div>
+                    <div class="table-container">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Vehicle No.</th>
+                                    <th>Vehicle Name</th>
+                                    <th>Model</th>
+                                    <th>Brand</th>
+                                    <th>Color</th>
+                                    <th>Engine No</th>
+                                    <th>Chassis No</th>
+                                    <th>Client Name</th>
+                                    <th>Client Phone</th>
+                                    <th>Odometer</th>
+                                    <th>Executive</th>
+                                    <th>Date & Time</th>
+                                    <th>Status</th>
+                                    <th>Complaint</th>
+                                    <th>Suggested</th>
+                                    <th>Approved</th>
+                                    <th>Marks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-report-table-body"></tbody>
+                        </table>
+                    </div>
                     <p id="admin-no-reports-message" class="text-center text-gray-500 py-8 hidden">No reports found matching your criteria.</p>
                 </div>
             </main>
@@ -168,9 +221,6 @@
         </div>
     </div>
 
-    <!-- =================================================================== -->
-    <!-- EXECUTIVE SCREENS (WITH DYNAMIC HEADER & BOTTOM NAV)                -->
-    <!-- =================================================================== -->
     <div id="executive-screens" class="screen">
         <header class="app-header">
             <div class="app-header-content">
@@ -184,10 +234,74 @@
 
         <div id="job-card-screen" class="executive-screen active-executive-screen">
              <main class="app-main">
-                <div class="card"><h2 class="text-xl font-bold mb-4">Find Vehicle</h2><div class="flex flex-col sm:flex-row gap-3"><input id="search-vehicle-number" type="text" placeholder="Enter Vehicle Number (e.g., MH12AB1234)" class="form-input flex-grow"><button onclick="searchVehicle()" class="btn-primary"><span class="material-symbols-outlined">search</span>Search</button></div><p id="search-error" class="text-red-500 text-sm mt-2 hidden"></p></div>
-                <div id="vehicle-details-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Vehicle Found</h2><div class="grid grid-cols-2 gap-4 text-base border-t pt-4"><div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="detail-vehicle-number" class="font-bold text-lg"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Brand</p><p id="detail-brand" class="font-semibold"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Model</p><p id="detail-model" class="font-semibold"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Fuel Type</p><p id="detail-fuel-type" class="font-semibold"></p></div><div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Odometer Reading</p><p id="detail-odometer" class="font-semibold"></p></div></div></div>
-                <div id="create-vehicle-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-orange-600"><span class="material-symbols-outlined">add_circle</span> Register New Vehicle</h2><form id="create-vehicle-form" onsubmit="event.preventDefault(); createVehicle();" class="border-t pt-4"><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label class="form-label">Vehicle Number</label><input id="new-vehicle-number" type="text" class="form-input bg-gray-100" readonly></div><div><label class="form-label">Brand</label><select id="new-vehicle-brand-exec" class="form-input" required onchange="populateModelDropdown()"></select></div><div><label class="form-label">Model</label><select id="new-vehicle-model-exec" class="form-input" required></select></div><div><label class="form-label">Fuel Type</label><select id="new-fuel-type" class="form-input" required><option value="">Select Type</option><option>Petrol</option><option>Diesel</option></select></div><div class="sm:col-span-2"><label class="form-label">Odometer Reading (km)</label><input id="new-odometer" type="number" class="form-input" placeholder="e.g., 54000" required></div></div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">save</span>Save Vehicle</button></div></form></div>
-                <div id="new-complaint-section" class="card hidden"><h2 class="text-xl font-bold mb-4">Register New Complaint</h2><form onsubmit="event.preventDefault(); saveComplaint();" class="border-t pt-4"><div><label for="complaint-description" class="form-label">Describe the issue in detail</label><textarea id="complaint-description" rows="5" class="form-input" placeholder="e.g., Engine is making a strange noise on startup..." required></textarea></div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">add_task</span>Save Complaint</button></div></form></div>
+                <div class="card"><h2 class="text-xl font-bold mb-4">Vehicle No:</h2><div class="flex flex-col sm:flex-row gap-3"><input id="search-vehicle-number" type="text" placeholder="Enter Vehicle Number (e.g., KL07AB1234)" class="form-input flex-grow"><button onclick="searchVehicle()" class="btn-primary"><span class="material-symbols-outlined">search</span>Search</button></div><p id="search-error" class="text-red-500 text-sm mt-2 hidden"></p></div>
+                
+                <div id="vehicle-details-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Vehicle Found</h2><div class="grid grid-cols-2 gap-x-4 gap-y-3 text-base border-t pt-4">
+                    <div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="detail-vehicle-number" class="font-bold text-lg"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Vehicle Name</p><p id="detail-vehicle-name" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Brand</p><p id="detail-brand" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Model</p><p id="detail-model" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Color</p><p id="detail-color" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Fuel Type</p><p id="detail-fuel-type" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Engine No.</p><p id="detail-engine-no" class="font-semibold"></p></div>
+                    <div><p class="font-medium text-[var(--text-secondary)]">Chassis No.</p><p id="detail-chassis-no" class="font-semibold"></p></div>
+                    <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Client Name</p><p id="detail-client-name" class="font-semibold"></p></div>
+                    <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Client Phone</p><p id="detail-client-phone" class="font-semibold"></p></div>
+                    <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Odometer Reading</p><div id="odometer-display-wrapper"><p id="detail-odometer" class="font-semibold"></p></div></div>
+                </div></div>
+                
+                <div id="create-vehicle-section" class="card hidden space-y-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2 text-orange-600"><span class="material-symbols-outlined">add_circle</span> Register New Vehicle</h2>
+                    <p class="text-sm text-gray-500 -mt-2">Vehicle not found. Please add the details below to register it.</p>
+                    <form id="create-vehicle-form" onsubmit="event.preventDefault(); createVehicle();" class="border-t pt-4"><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="form-label">Vehicle Number</label><input id="new-vehicle-number" type="text" class="form-input bg-gray-100" readonly></div>
+                    <div><label class="form-label">Vehicle Name</label><input id="new-vehicle-name" type="text" class="form-input" placeholder="e.g., Swift VXI" required></div>
+                    <div><label class="form-label">Brand</label><select id="new-vehicle-brand-exec" class="form-input" required onchange="populateModelDropdown()"></select></div>
+                    <div><label class="form-label">Model</label><select id="new-vehicle-model-exec" class="form-input" required></select></div>
+                    <div><label class="form-label">Color</label><input id="new-color" type="text" class="form-input" placeholder="e.g., White" required></div>
+                    <div><label class="form-label">Fuel Type</label><select id="new-fuel-type" class="form-input" required><option value="">Select Type</option><option>Petrol</option><option>Diesel</option></select></div>
+                    <div><label class="form-label">Engine Number</label><input id="new-engine-no" type="text" class="form-input" placeholder="Enter engine number" required></div>
+                    <div><label class="form-label">Chassis Number</label><input id="new-chassis-no" type="text" class="form-input" placeholder="Enter chassis number" required></div>
+                    <div class="sm:col-span-2"><label class="form-label">Odometer Reading (km)</label><input id="new-odometer" type="number" class="form-input" placeholder="e.g., 54000" required></div>
+                    <div class="sm:col-span-2 border-t pt-4"><label class="form-label">Client Name</label><input id="new-client-name" type="text" class="form-input" placeholder="e.g., John Doe" required></div>
+                    <div class="sm:col-span-2"><label class="form-label">Client Phone</label><input id="new-client-phone" type="tel" class="form-input" placeholder="e.g., 9876543210" required></div>
+                </div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">save</span>Save Vehicle</button></div></form></div>
+                
+                <div id="new-complaint-section" class="card hidden">
+                    <h2 class="text-xl font-bold mb-4">Register New Complaint(s)</h2>
+                    <div class="border-t pt-4 space-y-4">
+                        <div id="complaints-list" class="space-y-2">
+                            <p class="text-sm text-gray-500">No complaints added yet.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input id="complaint-input" type="text" class="form-input flex-grow" placeholder="e.g., Engine noise on startup" onkeydown="if(event.key==='Enter'){event.preventDefault(); addComplaint();}">
+                            <button type="button" onclick="addComplaint()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 shrink-0">
+                                <span class="material-symbols-outlined">add</span>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t">
+                          <label class="form-label">Mark Damages on Vehicle</label>
+                          <div class="relative inline-block border border-gray-300 rounded-lg overflow-hidden">
+							<img src="https://thumbs.dreamstime.com/b/car-line-art-ilustration-vector-car-line-art-ilustration-vector-car-line-art-ilustration-vector-118291586.jpg?w=768" id="carImage" alt="Car Outline" class="block w-full max-w-sm bg-white" crossorigin="anonymous"/>
+							<canvas id="damageCanvas" class="absolute top-0 left-0"></canvas>
+							<canvas id="checkCanvas" class="hidden"></canvas>
+						  </div>
+                          <p class="text-sm text-gray-500 mt-2">Click on the car image to mark scratches/damages.</p>
+                          <div class="flex items-center gap-3 mt-3">
+                              <button type="button" onclick="undoLastMark()" class="btn-secondary !py-2 !px-3 text-sm !w-auto flex items-center gap-1">
+                                  <span class="material-symbols-outlined text-base">undo</span>Undo Last
+                              </button>
+                              <button type="button" onclick="clearDamageCanvas()" class="flex items-center gap-1 !w-auto rounded-lg bg-red-100 text-red-700 font-bold py-2 px-3 shadow-sm hover:bg-red-200 transition-colors text-sm">
+                                  <span class="material-symbols-outlined text-base">delete_sweep</span>Clear All
+                              </button>
+                          </div>
+                          </div>
+                        <div class="mt-2">
+                            <button onclick="saveComplaints()" class="btn-primary"><span class="material-symbols-outlined">add_task</span>Save Complaints</button>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
 
@@ -210,9 +324,16 @@
             <main class="app-main">
                 <div class="card">
                     <h2 class="text-xl font-bold mb-4">Filter Reports</h2>
-                    <div id="report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
-                        <input type="date" id="filter-date" class="form-input" oninput="applyReportFilters()">
-                        <input type="month" id="filter-month" class="form-input" oninput="applyReportFilters()">
+                    <div id="report-filters" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                        <div class="space-y-1">
+    <label for="filter-from-date" class="text-xs font-medium text-gray-500">From Date</label>
+    <input type="date" id="filter-from-date" class="form-input" onchange="handleDateChange('filter-from-date', 'filter-to-date'); applyReportFilters();">
+</div>
+<div class="space-y-1">
+    <label for="filter-to-date" class="text-xs font-medium text-gray-500">To Date</label>
+    <input type="date" id="filter-to-date" class="form-input" onchange="handleDateChange('filter-from-date', 'filter-to-date'); applyReportFilters();">
+</div>
+                       
                         <input type="text" id="filter-vehicle-no" class="form-input" placeholder="Vehicle Number" oninput="applyReportFilters()">
                         <input type="text" id="filter-brand" class="form-input" placeholder="Brand" oninput="applyReportFilters()">
                         <input type="text" id="filter-exec-name" class="form-input" placeholder="Executive Name" oninput="applyReportFilters()">
@@ -220,20 +341,47 @@
                     </div>
                 </div>
                 <div class="card">
-                    <h2 class="text-xl font-bold mb-4">Service History</h2>
-                    <div class="table-container"><div class="table-scroll"><table class="report-table">
-                        <thead><tr><th>Vehicle No.</th><th>Model</th><th>Brand</th><th>Executive</th><th>Date & Time</th><th>Status</th></tr></thead>
-                        <tbody id="report-table-body"></tbody>
-                    </table></div></div>
+                    <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-bold">Service History</h2>
+    <button onclick="downloadReport()" class="flex items-center gap-1 px-3 py-1 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700">
+        <span class="material-symbols-outlined">download</span>
+        Download Report
+    </button>
+</div>
+                    <div class="table-container">
+                        <table class="report-table">
+                           <thead>
+                                <tr>
+                                    <th>Vehicle No.</th>
+                                    <th>Vehicle Name</th>
+                                    <th>Model</th>
+                                    <th>Brand</th>
+                                    <th>Color</th>
+                                    <th>Engine No</th>
+                                    <th>Chassis No</th>
+                                    <th>Client Name</th>
+                                    <th>Client Phone</th>
+                                    <th>Odometer</th>
+                                    <th>Executive</th>
+                                    <th>Date & Time</th>
+                                    <th>Status</th>
+                                    <th>Complaint</th>
+                                    <th>Suggested</th>
+                                    <th>Approved</th>
+                                    <th>Marks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-table-body"></tbody>
+                        </table>
+                    </div>
                     <p id="no-reports-message" class="text-center text-gray-500 py-8 hidden">No reports found matching your criteria.</p>
                 </div>
             </main>
         </div>
         <div id="due-date-screen" class="executive-screen" style="display: none;">
             <main class="app-main">
-                <div id="due-date-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Due date cards will be inserted here -->
-                </div>
+                <div id="due-date-list" class="space-y-1">
+                    </div>
                 <p id="no-due-dates-message" class="text-center text-gray-500 py-8 hidden">No upcoming due dates found.</p>
             </main>
         </div>
@@ -272,56 +420,235 @@
         </footer>
     </div>
     
-    <!-- MODALS & GLOBAL ELEMENTS -->
     <div id="success-message" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg hidden flex items-center gap-2 transition-transform duration-300 transform"><span class="material-symbols-outlined">check_circle</span><span id="success-text"></span></div>
     <div id="error-message" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg hidden flex items-center gap-2 transition-transform duration-300 transform"><span class="material-symbols-outlined">error</span><span id="error-text"></span></div>
 
     <div id="delete-confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-hidden"><div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div><div class="relative bg-white rounded-lg p-6 w-full max-w-sm m-4 space-y-4"><h3 class="text-xl font-bold text-gray-800">Confirm Deletion</h3><p id="delete-modal-text" class="text-gray-600"></p><div class="flex justify-end gap-4 pt-4"><button onclick="hideModal('delete-confirmation-modal')" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold">Cancel</button><button id="confirm-delete-button" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Confirm Delete</button></div></div></div>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <div id="marks-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 modal-hidden z-50">
+      <div class="bg-white rounded-lg p-4 relative max-w-lg w-full">
+        <button onclick="closeMarksModal()" class="absolute -top-2 -right-2 text-white bg-red-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">&times;</button>
+        <h2 class="text-lg font-bold mb-2">Damage Marks</h2>
+        <div class="relative inline-block">
+  <img src="https://thumbs.dreamstime.com/b/car-line-art-ilustration-vector-car-line-art-ilustration-vector-car-line-art-ilustration-vector-118291586.jpg?w=768"
+       id="modalCarImage" alt="Car Outline with Marks" class="block w-full max-w-sm bg-white" crossorigin="anonymous"/>
+  <canvas id="modalCanvas" class="absolute top-0 left-0"></canvas>
+</div>
+      </div>
+    </div>
+	<div id="printable-job-card" class="printable-area">
+    <style>
+        /* Specific styles for the print layout */
+        .print-body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #fff;
+            color: #000;
+        }
+        .print-header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .print-header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .print-header p {
+            margin: 5px 0 0;
+            font-size: 14px;
+        }
+        .print-section {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .print-section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .print-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .print-grid .details p, .print-details-list p {
+            margin: 0 0 8px;
+            font-size: 14px;
+        }
+        .print-grid .details strong, .print-details-list strong {
+            display: block;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 2px;
+        }
+        .print-details-list ul {
+            list-style-type: disc;
+            margin: 0;
+            padding-left: 20px;
+        }
+        .print-damage-section {
+            text-align: center;
+        }
+        .print-damage-section .image-container {
+            position: relative;
+            display: inline-block;
+            border: 1px solid #ccc;
+            padding: 5px;
+        }
+        .print-damage-section img {
+            display: block;
+            max-width: 400px;
+            background-color: #fff;
+        }
+        .print-damage-section canvas {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+        }
+        .print-footer {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 100px;
+            font-size: 14px;
+        }
+        .print-footer div {
+            border-top: 1px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+    </style>
+    <div class="print-body">
+        <div class="print-header">
+            <h1>AutoFix Service</h1>
+            <p>Job Card / Service Report</p>
+        </div>
+        
+        <div class="print-section">
+            <h2 class="print-section-title">Report & Vehicle Details</h2>
+            <div class="print-grid">
+                <div class="details">
+                    <p><strong>Report Date:</strong> <span id="print-report-date"></span></p>
+                    <p><strong>Client Name:</strong> <span id="print-client-name"></span></p>
+                    <p><strong>Client Phone:</strong> <span id="print-client-phone"></span></p>
+                    <p><strong>Service Executive:</strong> <span id="print-executive-name"></span></p>
+                </div>
+                <div class="details">
+                    <p><strong>Vehicle No:</strong> <span id="print-vehicle-no"></span></p>
+                    <p><strong>Vehicle Name:</strong> <span id="print-vehicle-name"></span></p>
+                    <p><strong>Engine/Chassis No:</strong> <span id="print-engine-chassis"></span></p>
+                    <p><strong>Odometer:</strong> <span id="print-odometer"></span> km</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="print-section print-details-list">
+            <h2 class="print-section-title">Service Details</h2>
+            <p><strong>Customer Complaints:</strong></p>
+            <ul id="print-complaints-list"></ul>
+            <br>
+            <p><strong>Suggested Repairs:</strong></p>
+            <ul id="print-suggested-list"></ul>
+            <br>
+            <p><strong>Approved Repairs:</strong></p>
+            <ul id="print-approved-list"></ul>
+        </div>
+
+        <div class="print-section print-damage-section">
+            <h2 class="print-section-title">Vehicle Damage Marks</h2>
+            <div class="image-container">
+                <img id="print-car-image" src="https://thumbs.dreamstime.com/b/car-line-art-ilustration-vector-car-line-art-ilustration-vector-car-line-art-ilustration-vector-118291586.jpg?w=768" crossorigin="anonymous" />
+                <canvas id="print-damage-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="print-footer">
+            <div><strong>Executive Signature</strong></div>
+            <div><strong>Customer Signature</strong></div>
+        </div>
+    </div>
+</div>
     <script>
         const { createClient } = supabase;
-        // IMPORTANT: Replace with your actual Supabase project URL and anon key
         const supabaseUrl = 'https://gfylsjfljnwyomfouwvs.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmeWxzamZsam53eW9tZm91d3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0MDc5MTYsImV4cCI6MjA3Mjk4MzkxNn0.hMvLvCDVaFtq0rXToHGOJPSFe-QnJ6_S-MYsI0d5zOs';
         const sb = createClient(supabaseUrl, supabaseKey);
 
-        // --- GLOBAL STATE ---
+        // --- Global State ---
         let currentUser = null;
         let vehicleModelsCache = [];
         let currentVehicleId = null;
         let currentReportId = null;
-        let currentSuggestions = [];
+        let originalComplaintsForUpdate = [];
+		let newSuggestions = [];
+        let currentComplaints = []; 
+        let currentOdometer = 0; 
+        let damageMarks = []; 
         
-        // --- UI ELEMENT REFERENCES ---
+        // --- UI Element References ---
         const vehicleDetailsSection = document.getElementById('vehicle-details-section'), createVehicleSection = document.getElementById('create-vehicle-section'), newComplaintSection = document.getElementById('new-complaint-section'), searchError = document.getElementById('search-error');
         const predictionList = document.getElementById('prediction-list'), updateDetailsSection = document.getElementById('update-details-section'), updateFormSection = document.getElementById('update-form-section');
 
-        // --- AUTHENTICATION ---
-        async function login(role) {
+        // --- Canvas-related variables ---
+        let carImage, damageCanvas, checkCanvas, damageCtx, checkCtx;
+
+        // --- AUTHENTICATION & UTILITIES ---
+        const normalizeVehicleNumber = (num) => {
+            if (!num) return '';
+            const cleanedNum = num.replace(/[\s-/]/g, '').toUpperCase();
+            // Match formats like KL7... or KL07...
+            const match = cleanedNum.match(/^([A-Z]{2})(\d{1,2})(.*)$/);
+            if (match) {
+                const stateCode = match[1];
+                let rtoCode = match[2];
+                const rest = match[3];
+                // If the RTO code is a single digit, pad it with a leading zero
+                if (rtoCode.length === 1) {
+                    rtoCode = '0' + rtoCode;
+                }
+                return `${stateCode}${rtoCode}${rest}`;
+            }
+            return cleanedNum; // Return the cleaned number if it doesn't match the pattern
+        };
+
+        async function login() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             if (!username || !password) return showError('Username and password are required.');
 
+            // Step 1: Find a user with a case-insensitive username match.
+            // This is robust against database collations (e.g., citext) that might be case-insensitive.
             const { data, error } = await sb
                 .from('users')
                 .select('*')
-                .eq('username', username)
-                .eq('password', password)
-                .eq('role', role)
-                .single();
+                .ilike('username', username) // Use case-insensitive search to find the user row
+                .single(); // Assumes usernames that differ only by case are unique in the DB
 
-            if (error || !data) return showError('Invalid credentials or role mismatch.');
+            // Step 2: Perform a strict, case-sensitive check on both username and password in JavaScript.
+            // This ensures that 'Admin' and 'admin' are treated as different users.
+            if (error || !data || data.password.toLowerCase() !== password.toLowerCase()) {
+    	    return showError('Invalid credentials.');
+           }
             
             currentUser = data;
-            sessionStorage.setItem('currentUser', JSON.stringify(currentUser)); // Persist user session
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser)); 
             
-            if (role === 'admin') {
+            if (currentUser.role === 'admin') {
                 showAdminScreen('admin-dashboard-screen');
-            } else {
+            } else if (currentUser.role === 'executive') {
                 document.getElementById('profile-username').textContent = currentUser.username;
                 document.getElementById('profile-role').textContent = currentUser.role;
                 showExecutiveScreen('job-card-screen');
+            } else {
+                return showError('Unknown user role.');
             }
             showSuccessMessage(`Welcome, ${currentUser.username}!`);
         }
@@ -335,13 +662,24 @@
             resetVehicleUpdateScreen();
             resetJobCardState();
         }
+function handleDateChange(fromId, toId) {
+    const fromDateInput = document.getElementById(fromId);
+    const toDateInput = document.getElementById(toId);
 
+    if (fromDateInput.value) {
+        toDateInput.min = fromDateInput.value;
+    }
+
+    if (toDateInput.value) {
+        fromDateInput.max = toDateInput.value;
+    }
+}
         // --- ADMIN: VEHICLE MANAGEMENT ---
         async function renderVehicleModelList() {
             const { data, error } = await sb.from('vehicle_models').select('*').order('brand');
             if (error) return showError('Could not fetch vehicle models.');
             
-            vehicleModelsCache = data; // Cache for other functions
+            vehicleModelsCache = data; 
             const list = document.getElementById('vehicle-models-list');
             list.innerHTML = '';
             if (data.length === 0) {
@@ -408,32 +746,91 @@
         async function fetchAndPopulateReports(isAdmin = false) {
             const tableBodyId = isAdmin ? 'admin-report-table-body' : 'report-table-body';
             const noReportsMsgId = isAdmin ? 'admin-no-reports-message' : 'no-reports-message';
-            const date = document.getElementById(isAdmin ? 'admin-filter-date' : 'filter-date').value;
-            const month = document.getElementById(isAdmin ? 'admin-filter-month' : 'filter-month').value;
-            const vehicleNo = document.getElementById(isAdmin ? 'admin-filter-vehicle-no' : 'filter-vehicle-no').value.toUpperCase();
-            const brand = document.getElementById(isAdmin ? 'admin-filter-brand' : 'filter-brand').value;
-            const execName = document.getElementById(isAdmin ? 'admin-filter-exec-name' : 'filter-exec-name').value;
             
-            let query = sb.from('reports').select(`
-                *,
-                vehicles ( vehicle_no, vehicle_models ( brand, model ) ),
-                users ( username )
-            `).order('created_at', { ascending: false });
-
-            // Apply filters
-            if(date) query = query.like('created_at', `${date}%`);
-            if(month) query = query.like('created_at', `${month}%`);
-            if(vehicleNo) query = query.ilike('vehicles.vehicle_no', `%${vehicleNo}%`);
-            if(brand) query = query.ilike('vehicles.vehicle_models.brand', `%${brand}%`);
-            if(execName) query = query.ilike('users.username', `%${execName}%`);
-
-            const { data, error } = await query;
-            if(error) return showError('Failed to fetch reports.');
-
             const tableBody = document.getElementById(tableBodyId);
             const noReportsMsg = document.getElementById(noReportsMsgId);
-            tableBody.innerHTML = '';
 
+           const fromDate = document.getElementById(isAdmin ? 'admin-filter-from-date' : 'filter-from-date').value;
+const toDate = document.getElementById(isAdmin ? 'admin-filter-to-date' : 'filter-to-date').value;
+            
+            const vehicleNo = document.getElementById(isAdmin ? 'admin-filter-vehicle-no' : 'filter-vehicle-no').value.trim().toUpperCase();
+            const brand = document.getElementById(isAdmin ? 'admin-filter-brand' : 'filter-brand').value.trim();
+            const execName = document.getElementById(isAdmin ? 'admin-filter-exec-name' : 'filter-exec-name').value.trim();
+
+            let vehicleIdFilter = null;
+
+            const intersect = (arr1, arr2) => arr1.filter(id => new Set(arr2).has(id));
+
+            if (vehicleNo) {
+                const { data, error } = await sb.from('vehicles').select('id').ilike('vehicle_no', `%${vehicleNo}%`);
+                vehicleIdFilter = data ? data.map(v => v.id) : [];
+            }
+
+            if (brand) {
+                const { data: models } = await sb.from('vehicle_models').select('id').ilike('brand', `%${brand}%`);
+                const modelIds = models && models.length > 0 ? models.map(m => m.id) : null;
+
+                if (modelIds) {
+                    const { data: vehicles } = await sb.from('vehicles').select('id').in('model_id', modelIds);
+                    const brandVehicleIds = vehicles ? vehicles.map(v => v.id) : [];
+                    
+                    if (vehicleIdFilter !== null) {
+                        vehicleIdFilter = intersect(vehicleIdFilter, brandVehicleIds);
+                    } else {
+                        vehicleIdFilter = brandVehicleIds;
+                    }
+                } else {
+                    vehicleIdFilter = [];
+                }
+            }
+
+            let query = sb.from('reports').select(`
+                id, created_at, status, complaint, suggested, approved, marks,
+                vehicles!inner( 
+                    *, 
+                    vehicle_models!inner( brand, model ) 
+                ),
+                users!inner( username )
+            `).order('created_at', { ascending: false });
+
+            if (vehicleIdFilter !== null) {
+                if (vehicleIdFilter.length === 0) {
+                    tableBody.innerHTML = '';
+                    noReportsMsg.classList.remove('hidden');
+                    return;
+                }
+                query = query.in('vehicle_id', vehicleIdFilter);
+            }
+            
+            if (execName) {
+                const { data } = await sb.from('users').select('id').ilike('username', `%${execName}%`);
+                const userIds = data ? data.map(u => u.id) : [];
+                if (userIds.length > 0) {
+                    query = query.in('executive_id', userIds);
+                } else {
+                    tableBody.innerHTML = '';
+                    noReportsMsg.classList.remove('hidden');
+                    return;
+                }
+            } else if (!isAdmin) {
+                query = query.eq('executive_id', currentUser.id);
+            }
+
+            if (fromDate) {
+    query = query.gte('created_at', `${fromDate}T00:00:00`);
+}
+if (toDate) {
+    query = query.lte('created_at', `${toDate}T23:59:59`);
+}
+           
+
+            const { data, error } = await query;
+            if (error) {
+                console.error('Filter Error:', error);
+                return showError('Failed to fetch filtered reports.');
+            }
+
+            tableBody.innerHTML = '';
             if (data.length === 0) {
                 noReportsMsg.classList.remove('hidden');
                 return;
@@ -443,24 +840,46 @@
             const statusColors = { 'Completed': 'bg-green-100 text-green-800', 'Ongoing': 'bg-orange-100 text-orange-800', 'Not Started': 'bg-red-100 text-red-800' };
             data.forEach(row => {
                 const tr = document.createElement('tr');
+                let marksButton = 'N/A';
+                if (row.marks && row.marks.length > 2) { 
+                    marksButton = `<button onclick='openMarksModal(${JSON.stringify(row.marks)})' class="px-2 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-xs">View</button>`;
+                }
+
                 tr.innerHTML = `
                     <td>${row.vehicles.vehicle_no}</td>
+                    <td>${row.vehicles.vehicle_name || 'N/A'}</td>
                     <td>${row.vehicles.vehicle_models.model}</td>
                     <td>${row.vehicles.vehicle_models.brand}</td>
+                    <td>${row.vehicles.color || 'N/A'}</td>
+                    <td>${row.vehicles.engine_no || 'N/A'}</td>
+                    <td>${row.vehicles.chassis_no || 'N/A'}</td>
+                    <td>${row.vehicles.client_name || 'N/A'}</td>
+                    <td>${row.vehicles.client_phone || 'N/A'}</td>
+                    <td>${row.vehicles.odometer}</td>
                     <td>${row.users.username}</td>
-                    <td>${new Date(row.created_at).toLocaleString()}</td>
+                    <td>${new Date(row.created_at).toLocaleString('en-GB')}</td>
                     <td><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[row.status] || 'bg-gray-100 text-gray-800'}">${row.status}</span></td>
+                    <td class="whitespace-normal max-w-xs truncate" title="${formatArrayCell(row.complaint)}">${formatArrayCell(row.complaint)}</td>
+                    <td class="whitespace-normal max-w-xs truncate" title="${formatArrayCell(row.suggested)}">${formatArrayCell(row.suggested)}</td>
+                    <td class="whitespace-normal max-w-xs truncate" title="${formatArrayCell(row.approved)}">${formatArrayCell(row.approved)}</td>
+                    <td>${marksButton}</td>
                 `;
+				tr.ondblclick = () => printJobCard(row); // Add this line
                 tableBody.appendChild(tr);
             });
         }
         
         function applyAdminReportFilters() { fetchAndPopulateReports(true); }
-        function clearAdminReportFilters() { document.getElementById('admin-report-filters').querySelectorAll('input').forEach(input => input.value = ''); fetchAndPopulateReports(true); }
+       function clearReportFilters() { 
+    document.getElementById('report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); 
+    document.getElementById('filter-to-date').min = '';
+    document.getElementById('filter-from-date').max = '';
+    fetchAndPopulateReports(false); 
+}
         function applyReportFilters() { fetchAndPopulateReports(false); }
-        function clearReportFilters() { document.getElementById('report-filters').querySelectorAll('input').forEach(input => input.value = ''); fetchAndPopulateReports(false); }
+        function clearReportFilters() { document.getElementById('report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); fetchAndPopulateReports(false); }
 
-        // --- ADMIN: ANALYTICS ---
+
         async function renderAnalytics() {
             const month = document.getElementById('analytics-month-filter').value;
             const executiveId = document.getElementById('analytics-exec-filter').value;
@@ -487,7 +906,6 @@
         }
 
         async function populateAnalyticsFilters() {
-            // Populate executives
             const { data: execs, error: execsError } = await sb.from('users').select('id, username').eq('role', 'executive');
             if(execsError) return showError('Could not load executives.');
             const execFilter = document.getElementById('analytics-exec-filter');
@@ -499,7 +917,6 @@
                 execFilter.appendChild(opt);
             });
 
-            // Populate months
             const { data: reports, error: reportsError } = await sb.from('reports').select('created_at');
             if(reportsError) return showError('Could not load report dates.');
             const monthFilter = document.getElementById('analytics-month-filter');
@@ -512,10 +929,63 @@
                 monthFilter.appendChild(opt);
             });
         }
-
+        
         // --- EXECUTIVE: JOB CARD ---
+        async function searchVehicle() {
+            const rawVehicleNumber = document.getElementById('search-vehicle-number').value;
+            const vehicleNumber = normalizeVehicleNumber(rawVehicleNumber);
+            hideAllSections();
+            if (!vehicleNumber) {
+                showError('Please enter a vehicle number.');
+                return;
+            }
+
+            const { data, error } = await sb
+                .from('vehicles')
+                .select(`
+                    id, vehicle_no, fuel_type, odometer, client_name, client_phone, vehicle_name, color, engine_no, chassis_no,
+                    vehicle_models ( brand, model )
+                `)
+                .eq('vehicle_no', vehicleNumber)
+                .single();
+            
+            const odometerWrapper = document.getElementById('odometer-display-wrapper');
+
+            if (data) { 
+                currentVehicleId = data.id;
+                currentOdometer = data.odometer;
+                document.getElementById('detail-vehicle-number').textContent = data.vehicle_no;
+                document.getElementById('detail-brand').textContent = data.vehicle_models.brand;
+                document.getElementById('detail-model').textContent = data.vehicle_models.model;
+                document.getElementById('detail-fuel-type').textContent = data.fuel_type;
+                document.getElementById('detail-client-name').textContent = data.client_name || 'N/A';
+                document.getElementById('detail-client-phone').textContent = data.client_phone || 'N/A';
+                document.getElementById('detail-vehicle-name').textContent = data.vehicle_name || 'N/A';
+                document.getElementById('detail-color').textContent = data.color || 'N/A';
+                document.getElementById('detail-engine-no').textContent = data.engine_no || 'N/A';
+                document.getElementById('detail-chassis-no').textContent = data.chassis_no || 'N/A';
+
+                odometerWrapper.innerHTML = `<input type="number" id="detail-odometer-input" class="form-input" value="${data.odometer}">`;
+                document.getElementById('detail-odometer-input').addEventListener('input', checkOdometer);
+                
+                vehicleDetailsSection.classList.remove('hidden');
+                newComplaintSection.classList.remove('hidden');
+
+                // FIX: Resize canvas now that it's visible
+                setTimeout(resizeCanvas, 50);
+
+            } else { 
+                currentVehicleId = null;
+                currentOdometer = 0;
+                odometerWrapper.innerHTML = `<p id="detail-odometer" class="font-semibold"></p>`;
+                document.getElementById('new-vehicle-number').value = vehicleNumber;
+                populateExecutiveVehicleDropdowns();
+                createVehicleSection.classList.remove('hidden');
+            }
+        }
+        
         async function populateExecutiveVehicleDropdowns() {
-            if (vehicleModelsCache.length === 0) { // Fetch if cache is empty
+            if (vehicleModelsCache.length === 0) { 
                 const { data, error } = await sb.from('vehicle_models').select('*');
                 if (error) return showError('Could not fetch vehicle models.');
                 vehicleModelsCache = data;
@@ -542,51 +1012,34 @@
             const modelsForBrand = vehicleModelsCache.filter(item => item.brand === brand);
             modelsForBrand.forEach(item => {
                 const opt = document.createElement('option');
-                opt.value = item.id; // Use model ID as value
+                opt.value = item.id; 
                 opt.textContent = item.model;
                 modelSelect.appendChild(opt);
             });
         }
-        
-        async function searchVehicle() {
-            const vehicleNumber = document.getElementById('search-vehicle-number').value.trim().toUpperCase();
-            hideAllSections();
-            if (!vehicleNumber) {
-                showError('Please enter a vehicle number.');
-                return;
-            }
 
-            const { data, error } = await sb
-                .from('vehicles')
-                .select(`id, vehicle_no, fuel_type, odometer, vehicle_models ( brand, model )`)
-                .eq('vehicle_no', vehicleNumber)
-                .single();
-
-            if (data) { // Vehicle exists
-                currentVehicleId = data.id;
-                document.getElementById('detail-vehicle-number').textContent = data.vehicle_no;
-                document.getElementById('detail-brand').textContent = data.vehicle_models.brand;
-                document.getElementById('detail-model').textContent = data.vehicle_models.model;
-                document.getElementById('detail-fuel-type').textContent = data.fuel_type;
-                document.getElementById('detail-odometer').textContent = data.odometer + ' km';
-                vehicleDetailsSection.classList.remove('hidden');
-                newComplaintSection.classList.remove('hidden');
-            } else { // New vehicle
-                currentVehicleId = null;
-                document.getElementById('new-vehicle-number').value = vehicleNumber;
-                populateExecutiveVehicleDropdowns();
-                createVehicleSection.classList.remove('hidden');
+        function checkOdometer() {
+            const newOdometer = document.getElementById('detail-odometer-input').value;
+            if (parseInt(newOdometer) < currentOdometer) {
+                showError('Warning: New reading is lower than the previous one.');
             }
         }
-
+        
         async function createVehicle() {
             const newVehicle = {
-                vehicle_no: document.getElementById('new-vehicle-number').value,
+                vehicle_no: normalizeVehicleNumber(document.getElementById('new-vehicle-number').value),
                 model_id: document.getElementById('new-vehicle-model-exec').value,
                 fuel_type: document.getElementById('new-fuel-type').value,
-                odometer: document.getElementById('new-odometer').value
+                odometer: document.getElementById('new-odometer').value,
+                vehicle_name: document.getElementById('new-vehicle-name').value.trim(),
+                color: document.getElementById('new-color').value.trim(),
+                engine_no: document.getElementById('new-engine-no').value.trim(),
+                chassis_no: document.getElementById('new-chassis-no').value.trim(),
+                client_name: document.getElementById('new-client-name').value.trim(),
+                client_phone: document.getElementById('new-client-phone').value.trim()
             };
-            if (!newVehicle.model_id || !newVehicle.fuel_type || !newVehicle.odometer) {
+
+            if (!newVehicle.model_id || !newVehicle.fuel_type || !newVehicle.odometer || !newVehicle.client_name || !newVehicle.client_phone || !newVehicle.vehicle_name || !newVehicle.color || !newVehicle.engine_no || !newVehicle.chassis_no) {
                 return showError('Please fill all vehicle details.');
             }
 
@@ -597,29 +1050,79 @@
             document.getElementById('create-vehicle-form').reset();
             createVehicleSection.classList.add('hidden');
             showSuccessMessage('Vehicle created successfully!');
-            searchVehicle(); // Re-run search to show details
+            searchVehicle();
         }
-        
-        async function saveComplaint() {
-            const complaint = document.getElementById('complaint-description').value.trim();
-            if (!complaint) return showError('Complaint description is required.');
-            if (!currentVehicleId) return showError('No vehicle selected.');
 
+        function addComplaint() {
+            const complaintInput = document.getElementById('complaint-input');
+            const complaintText = complaintInput.value.trim();
+            if (complaintText) {
+                currentComplaints.push(complaintText);
+                complaintInput.value = '';
+                renderComplaints();
+            }
+            complaintInput.focus();
+        }
+
+        function deleteComplaint(index) {
+            currentComplaints.splice(index, 1);
+            renderComplaints();
+        }
+
+        function renderComplaints() {
+            const list = document.getElementById('complaints-list');
+            list.innerHTML = '';
+
+            if (currentComplaints.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-500">No complaints added yet.</p>';
+                return;
+            }
+
+            currentComplaints.forEach((text, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-lg text-sm';
+                item.innerHTML = `
+                    <p class="flex-1 mr-2">${text}</p>
+                    <button onclick="deleteComplaint(${index})" class="text-red-500 hover:text-red-700 shrink-0">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function saveComplaints() {
+            addComplaint(); 
+            
+            if (currentComplaints.length === 0) return showError('Please add at least one complaint.');
+            if (!currentVehicleId) return showError('No vehicle selected.');
+            
+            const newOdometerInput = document.getElementById('detail-odometer-input');
+            const newOdometerValue = newOdometerInput ? newOdometerInput.value : null;
+
+            if (newOdometerValue && parseInt(newOdometerValue) !== currentOdometer) {
+                const { error: odometerError } = await sb
+                    .from('vehicles')
+                    .update({ odometer: newOdometerValue })
+                    .eq('id', currentVehicleId);
+                if (odometerError) return showError('Failed to update odometer reading.');
+            }
+            
             const newReport = {
                 vehicle_id: currentVehicleId,
                 executive_id: currentUser.id,
-                complaint: complaint,
-                status: 'Not Started'
+                complaint: JSON.stringify(currentComplaints),
+                status: 'Not Started',
+                marks: JSON.stringify(damageMarks)
             };
 
             const { error } = await sb.from('reports').insert(newReport);
-            if(error) return showError(`Failed to save complaint: ${error.message}`);
+            if(error) return showError(`Failed to save complaints: ${error.message}`);
             
-            showSuccessMessage('Complaint saved successfully!');
+            showSuccessMessage('Report saved successfully!');
             resetJobCardState();
         }
-
-        // --- EXECUTIVE: UPDATE VEHICLE ---
+        
         async function handleReportUpdateSearch() {
             const input = document.getElementById('update-search-input').value.trim().toUpperCase();
             predictionList.innerHTML = '';
@@ -628,28 +1131,16 @@
                 return;
             }
 
-            // Step 1: Find vehicle IDs that match the search input.
-            const { data: vehiclesData, error: vehiclesError } = await sb
-                .from('vehicles')
-                .select('id')
-                .ilike('vehicle_no', `%${input}%`);
-
-            if (vehiclesError || !vehiclesData || vehiclesData.length === 0) {
+            const { data: vehiclesData } = await sb.from('vehicles').select('id').ilike('vehicle_no', `%${input}%`);
+            if (!vehiclesData || vehiclesData.length === 0) {
                 predictionList.classList.add('hidden');
                 return;
             }
 
             const vehicleIds = vehiclesData.map(v => v.id);
 
-            // Step 2: Use the found vehicle IDs to find their corresponding reports that are not 'Completed'.
-            const { data, error } = await sb
-                .from('reports')
-                .select(`id, complaint, vehicles(vehicle_no)`)
-                .in('vehicle_id', vehicleIds)
-                .neq('status', 'Completed')
-                .limit(5);
-            
-            if (error || !data || data.length === 0) {
+            const { data } = await sb.from('reports').select(`id, complaint, vehicles!inner(vehicle_no)`).in('vehicle_id', vehicleIds).neq('status', 'Completed').limit(5);
+            if (!data || data.length === 0) {
                 predictionList.classList.add('hidden');
                 return;
             }
@@ -657,7 +1148,7 @@
             data.forEach(report => {
                 const item = document.createElement('div');
                 item.className = 'p-3 hover:bg-gray-100 cursor-pointer';
-                item.textContent = `${report.vehicles.vehicle_no} - ${report.complaint}`;
+                item.textContent = `${report.vehicles.vehicle_no} - ${formatArrayCell(report.complaint)}`;
                 item.onclick = () => selectReportForUpdate(report);
                 predictionList.appendChild(item);
             });
@@ -665,75 +1156,108 @@
         }
 
         function selectReportForUpdate(report) {
-            currentReportId = report.id;
-            document.getElementById('update-search-input').value = report.vehicles.vehicle_no;
-            predictionList.classList.add('hidden');
-            document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
-            document.getElementById('update-detail-complaint').textContent = report.complaint;
-            updateDetailsSection.classList.remove('hidden');
-            updateFormSection.classList.remove('hidden');
-            currentSuggestions = [];
-            renderSuggestions();
-        }
+    currentReportId = report.id;
+    document.getElementById('update-search-input').value = report.vehicles.vehicle_no;
+    predictionList.classList.add('hidden');
+    document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
+    document.getElementById('update-detail-complaint').textContent = formatArrayCell(report.complaint);
+    updateDetailsSection.classList.remove('hidden');
+    updateFormSection.classList.remove('hidden');
+
+    // Store original complaints and reset new suggestions
+    try {
+        originalComplaintsForUpdate = JSON.parse(report.complaint || '[]');
+    } catch (e) {
+        console.error("Could not parse complaints:", e);
+        originalComplaintsForUpdate = [];
+    }
+    newSuggestions = []; // Reset new suggestions for the new report
+
+    renderSuggestions();
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('delivery-date').setAttribute('min', today);
+}
 
         function addSuggestion() {
-            const input = document.getElementById('suggestion-input');
-            const suggestionText = input.value.trim();
-            if (suggestionText) {
-                currentSuggestions.push(suggestionText);
-                input.value = '';
-                renderSuggestions();
-            }
-        }
+    const input = document.getElementById('suggestion-input');
+    const suggestionText = input.value.trim();
+    if (suggestionText) {
+        newSuggestions.push(suggestionText); // Changed to push to newSuggestions
+        input.value = '';
+        renderSuggestions();
+    }
+}
 
         function renderSuggestions() {
-            const executiveList = document.getElementById('executive-suggestions-list');
-            const customerList = document.getElementById('customer-approval-list');
-            executiveList.innerHTML = '';
-            customerList.innerHTML = '';
+    const executiveList = document.getElementById('executive-suggestions-list');
+    const customerList = document.getElementById('customer-approval-list');
+    executiveList.innerHTML = '';
+    customerList.innerHTML = '';
 
-            if (currentSuggestions.length === 0) {
-                customerList.innerHTML = '<p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p>';
-                return;
-            }
-            currentSuggestions.forEach(text => {
-                const execItem = document.createElement('div');
-                execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
-                execItem.textContent = text;
-                executiveList.appendChild(execItem);
-                
-                const customerItem = document.createElement('label');
-                customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
-                customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
-                customerList.appendChild(customerItem);
-            });
-        }
+    // Part 1: Render original complaints as non-selectable items in the customer list
+    if (originalComplaintsForUpdate.length > 0) {
+        originalComplaintsForUpdate.forEach(text => {
+            const customerItem = document.createElement('label');
+            customerItem.className = 'flex items-center gap-3 p-3 bg-gray-100 rounded-lg cursor-not-allowed opacity-75';
+            // Checkbox is checked and disabled for reference
+            customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-gray-400 focus:ring-0" checked disabled><span class="flex-1">${text}</span>`;
+            customerList.appendChild(customerItem);
+        });
+    }
+
+    // Part 2: Render NEW suggestions from the executive
+    if (newSuggestions.length > 0) {
+        newSuggestions.forEach(text => {
+            // Add to the executive's view-only list
+            const execItem = document.createElement('div');
+            execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
+            execItem.textContent = text;
+            executiveList.appendChild(execItem);
+
+            // Add as a selectable checkbox to the customer's approval list
+            const customerItem = document.createElement('label');
+            customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
+            customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
+            customerList.appendChild(customerItem);
+        });
+    }
+
+    // Handle empty state for customer approval list
+    if (customerList.innerHTML === '') {
+        customerList.innerHTML = '<p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p>';
+    }
+}
         
         async function saveVehicleUpdate() {
-            if(!currentReportId) return showError('No report selected for update.');
+    if(!currentReportId) return showError('No report selected for update.');
 
-            const deliveryDate = document.getElementById('delivery-date').value;
-            if(!deliveryDate) return showError('Please select an expected delivery date.');
+    const deliveryDate = document.getElementById('delivery-date').value;
+    if(!deliveryDate) return showError('Please select an expected delivery date.');
 
-            const approvedItems = [];
-            document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
-                approvedItems.push(checkbox.nextElementSibling.textContent);
-            });
+    const approvedItems = [];
+    // Important: Select only checkboxes that are checked but NOT disabled
+    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked:not(:disabled)').forEach(checkbox => {
+        approvedItems.push(checkbox.nextElementSibling.textContent);
+    });
 
-            const updateData = {
-                suggested: JSON.stringify(currentSuggestions),
-                approved: JSON.stringify(approvedItems),
-                expected_delivery: deliveryDate,
-                status: 'Ongoing'
-            };
+    // Combine original complaints and new executive suggestions for the "suggested" field
+    const allSuggestions = [...originalComplaintsForUpdate, ...newSuggestions];
 
-            const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
-            if(error) return showError(`Failed to save update: ${error.message}`);
-            
-            showSuccessMessage('Update saved successfully!');
-            resetVehicleUpdateScreen();
-        }
+    const updateData = {
+        suggested: JSON.stringify(allSuggestions),
+        approved: JSON.stringify(approvedItems),
+        expected_delivery: deliveryDate,
+        status: 'Ongoing'
+    };
 
+    const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
+    if(error) return showError(`Failed to save update: ${error.message}`);
+
+    showSuccessMessage('Update saved successfully!');
+    resetVehicleUpdateScreen();
+}
+        
         // --- EXECUTIVE: DUE DATES ---
         async function populateDueDateScreen() {
             const listContainer = document.getElementById('due-date-list');
@@ -741,28 +1265,116 @@
             listContainer.innerHTML = '';
 
             const { data, error } = await sb.from('reports')
-                .select(`id, complaint, expected_delivery, status, vehicles(vehicle_no)`)
+                .select(`id, complaint, expected_delivery, status, vehicles!inner(vehicle_no)`)
+                .eq('executive_id', currentUser.id)
                 .in('status', ['Not Started', 'Ongoing'])
-                .order('expected_delivery');
+                .order('expected_delivery', { ascending: true, nullsfirst: false });
             
             if(error) return showError('Could not fetch due dates.');
-            if (data.length === 0) {
+
+            if (!data || data.length === 0) {
                 noDatesMsg.classList.remove('hidden');
                 return;
             }
             noDatesMsg.classList.add('hidden');
 
-            const statusOptions = ['Not Started', 'Ongoing', 'Completed'];
+            const groupedJobs = {};
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
             data.forEach(job => {
-                const card = document.createElement('div');
-                card.className = 'card space-y-3';
-                let optionsHtml = statusOptions.map(opt => `<option value="${opt}" ${job.status === opt ? 'selected' : ''}>${opt}</option>`).join('');
-                card.innerHTML = `
-                    <div><p class="font-bold text-lg">${job.vehicles.vehicle_no}</p><p class="text-sm text-gray-500">${job.complaint}</p></div>
-                    <div class="border-t pt-3"><p class="text-sm font-medium">Due: <span class="font-bold text-blue-600">${job.expected_delivery || 'Not set'}</span></p></div>
-                    <div class="flex items-center gap-2"><label class="text-sm font-medium">Status:</label><select onchange="updateJobStatus(${job.id}, this.value, '${job.vehicles.vehicle_no}')" class="form-input text-sm !py-1 !px-2 w-auto">${optionsHtml}</select></div>`;
-                listContainer.appendChild(card);
+                if (!job.expected_delivery) return; 
+
+                const dueDate = new Date(job.expected_delivery + 'T00:00:00Z');
+                let groupKey = '';
+                 let sortKey = job.expected_delivery;
+
+                if (dueDate < today) {
+                    groupKey = 'Overdue';
+                    sortKey = `1-${job.expected_delivery}`;
+                } else if (dueDate.getTime() === today.getTime()) {
+                    groupKey = 'Today';
+                    sortKey = `2-${job.expected_delivery}`;
+                } else if (dueDate.getTime() === tomorrow.getTime()) {
+                    groupKey = 'Tomorrow';
+                     sortKey = `3-${job.expected_delivery}`;
+                } else {
+                    groupKey = dueDate.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+                    sortKey = `4-${job.expected_delivery}`;
+                }
+
+                if (!groupedJobs[groupKey]) {
+                    groupedJobs[groupKey] = { jobs: [], sortKey: sortKey };
+                }
+                groupedJobs[groupKey].jobs.push(job);
             });
+
+            const sortedGroupKeys = Object.keys(groupedJobs).sort((a, b) => {
+                return groupedJobs[a].sortKey.localeCompare(groupedJobs[b].sortKey);
+            });
+
+            sortedGroupKeys.forEach(groupKey => {
+                const group = groupedJobs[groupKey];
+                 if (group.jobs.length > 0) {
+                    const header = document.createElement('div');
+                    const isImmediate = groupKey === 'Overdue' || groupKey === 'Today';
+                    
+                    let headerColor = isImmediate ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700';
+                    
+                    header.className = `py-2 px-4 ${headerColor} rounded-lg text-sm font-bold sticky top-[64px] z-10`; 
+                    header.textContent = `${groupKey} (${group.jobs.length})`;
+                    listContainer.appendChild(header);
+                    
+                    const sortedJobs = group.jobs.sort((a, b) => a.vehicles.vehicle_no.localeCompare(b.vehicles.vehicle_no));
+
+                    sortedJobs.forEach(job => {
+                        const itemContainer = document.createElement('div');
+                        const itemBorderClass = isImmediate ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-transparent';
+                        itemContainer.className = `due-date-item bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden ${itemBorderClass}`;
+                        
+                        const statusOptions = ['Not Started', 'Ongoing', 'Completed'];
+                        let optionsHtml = statusOptions.map(opt => `<option value="${opt}" ${job.status === opt ? 'selected' : ''}>${opt}</option>`).join('');
+
+                        itemContainer.innerHTML = `
+                            <div class="due-date-header p-4 flex justify-between items-center cursor-pointer" onclick="toggleDueDateItem(this.parentElement)">
+                                <div>
+                                    <p class="font-bold text-gray-800">${job.vehicles.vehicle_no}</p>
+                                    <p class="text-sm text-gray-500">${job.status}</p>
+                                </div>
+                                <span class="material-symbols-outlined transition-transform duration-300">expand_more</span>
+                            </div>
+                            <div class="due-date-details">
+                                <div class="p-4 border-t border-gray-200">
+                                    <p class="text-sm text-gray-600 mb-4"><strong>Complaint:</strong> ${formatArrayCell(job.complaint)}</p>
+                                    <div class="flex items-center gap-3">
+                                        <label class="text-sm font-medium text-gray-600 shrink-0">Update Status:</label>
+                                        <select onchange="updateJobStatus(${job.id}, this.value, '${job.vehicles.vehicle_no}')" class="form-input text-sm !py-1.5 !px-2 w-full">${optionsHtml}</select>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        listContainer.appendChild(itemContainer);
+                    });
+                }
+            });
+        }
+        
+        function toggleDueDateItem(element) {
+            const isExpanded = element.classList.contains('expanded');
+            
+            document.querySelectorAll('.due-date-item.expanded').forEach(item => {
+                if (item !== element) {
+                    item.classList.remove('expanded');
+                }
+            });
+
+            if (isExpanded) {
+                element.classList.remove('expanded');
+            } else {
+                element.classList.add('expanded');
+            }
         }
         
         async function updateJobStatus(id, newStatus, vehicleNo) {
@@ -770,10 +1382,9 @@
             if(error) return showError('Failed to update status.');
 
             showSuccessMessage(`Status for ${vehicleNo} updated to ${newStatus}`);
-            populateDueDateScreen();
+            setTimeout(populateDueDateScreen, 500); 
         }
         
-        // --- EXECUTIVE: PROFILE ---
         async function resetPassword() {
             const currentPassword = document.getElementById('current-password').value;
             const newPassword = document.getElementById('new-password').value;
@@ -786,12 +1397,11 @@
             if (error) return showError('Could not reset password.');
 
             showSuccessMessage('Password reset successfully!');
-            currentUser.password = newPassword; // Update local state
+            currentUser.password = newPassword; 
             sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
             document.querySelector('#profile-screen form').reset();
         }
 
-        // --- DELETION LOGIC ---
         function confirmDeletion(type, id, role) {
             const modal = document.getElementById('delete-confirmation-modal');
             const text = document.getElementById('delete-modal-text');
@@ -818,12 +1428,20 @@
             if(error) return showError(`Deletion failed: ${error.message}`);
 
             showSuccessMessage('Item deleted successfully.');
-            // Refresh the relevant list
             if (type === 'user') renderUserList(role);
             if (type === 'vehicle_model') renderVehicleModelList();
         }
 
-        // --- UTILITY & UI FUNCTIONS ---
+        const formatArrayCell = (jsonString) => {
+            if (!jsonString || jsonString === '[]') return 'N/A';
+            try {
+                const arr = JSON.parse(jsonString);
+                return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'N/A';
+            } catch (e) {
+                return jsonString; 
+            }
+        };
+
         function hideAllSections() {
             vehicleDetailsSection.classList.add('hidden');
             createVehicleSection.classList.add('hidden');
@@ -834,9 +1452,12 @@
         function resetJobCardState() {
             hideAllSections();
             document.getElementById('search-vehicle-number').value = '';
-            document.getElementById('complaint-description').value = '';
             document.getElementById('create-vehicle-form').reset();
             currentVehicleId = null;
+            currentComplaints = [];
+            renderComplaints();
+            document.getElementById('odometer-display-wrapper').innerHTML = `<p id="detail-odometer" class="font-semibold"></p>`;
+            clearDamageCanvas();
         }
 
         function resetVehicleUpdateScreen() {
@@ -850,13 +1471,87 @@
             renderSuggestions();
         }
 
+        // --- Damage Marking Functions ---
+        function resizeCanvas() {
+            if (!carImage || !damageCanvas || !checkCanvas) return;
+
+            const redraw = () => {
+                const w = carImage.clientWidth;
+                const h = carImage.clientHeight;
+                if (w === 0 || h === 0) return;
+
+                damageCanvas.width = w;
+                damageCanvas.height = h;
+                checkCanvas.width = w;
+                checkCanvas.height = h;
+
+                checkCtx.drawImage(carImage, 0, 0, w, h);
+                redrawDamageMarks(damageCanvas, damageMarks);
+            };
+
+            // Use requestAnimationFrame to wait for the browser to be ready to paint
+            requestAnimationFrame(redraw);
+        }
+
+        // ADDED: New function to undo the last mark
+        function undoLastMark() {
+            if (damageMarks.length > 0) {
+                damageMarks.pop(); // Remove the last element from the array
+                redrawDamageMarks(damageCanvas, damageMarks); // Redraw the canvas without the last mark
+            }
+        }
+
+        function clearDamageCanvas() {
+            if (damageCtx) {
+                damageCtx.clearRect(0, 0, damageCanvas.width, damageCanvas.height);
+            }
+            damageMarks = [];
+        }
+
+        function redrawDamageMarks(canvas, marks) {
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!marks) return;
+
+            marks.forEach(mark => {
+                ctx.fillStyle = "red";
+                ctx.beginPath();
+                ctx.arc(mark.x, mark.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        function openMarksModal(marks) {
+            const marksArray = typeof marks === 'string' ? JSON.parse(marks) : marks;
+            
+            const modal = document.getElementById("marks-modal");
+            modal.classList.remove("modal-hidden");
+            const modalCanvas = document.getElementById("modalCanvas");
+            const modalImage = document.getElementById("modalCarImage");
+
+            const drawOnModal = () => {
+                modalCanvas.width = modalImage.clientWidth;
+                modalCanvas.height = modalImage.clientHeight;
+                redrawDamageMarks(modalCanvas, marksArray);
+            };
+
+            if (modalImage.complete) {
+                drawOnModal();
+            } else {
+                modalImage.onload = drawOnModal;
+            }
+        }
+
+        function closeMarksModal() {
+            document.getElementById("marks-modal").classList.add("modal-hidden");
+        }
+        
         function showScreen(screenId) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen')); document.getElementById(screenId).classList.add('active-screen'); }
         
         function showAdminScreen(screenId) {
             document.querySelectorAll('#admin-screens .admin-screen').forEach(s => s.style.display = 'none');
             document.getElementById(screenId).style.display = 'block';
             
-            // Fetch data for the specific admin screen
             if (screenId === 'admin-vehicle-management-screen') renderVehicleModelList();
             if (screenId === 'admin-reports-screen') fetchAndPopulateReports(true);
             if (screenId === 'admin-analytics-screen') { populateAnalyticsFilters(); renderAnalytics(); }
@@ -871,13 +1566,12 @@
             document.getElementById(screenId).style.display = 'block';
             setActiveNav(screenId);
             
-            // Fetch data for the specific executive screen
             if (screenId === 'report-screen') fetchAndPopulateReports(false);
             if (screenId === 'due-date-screen') populateDueDateScreen();
-            if (screenId === 'job-card-screen') resetJobCardState();
-            // No action needed for vehicle-update-screen on entry, it preserves its state.
-            // The reset function is called after a successful update or on logout.
-
+            if (screenId === 'job-card-screen') {
+                resetJobCardState();
+            }
+            
             showScreen('executive-screens');
         }
 
@@ -909,8 +1603,6 @@
             setTimeout(() => el.classList.add('hidden'), 4000);
         }
 
-        // --- INITIALIZATION ---
-        // Check for a logged-in user on page load
         document.addEventListener('DOMContentLoaded', () => {
             const savedUser = sessionStorage.getItem('currentUser');
             if (savedUser) {
@@ -923,10 +1615,172 @@
                     showExecutiveScreen('job-card-screen');
                 }
             }
+
+            // --- Damage Canvas Setup ---
+            carImage = document.getElementById("carImage");
+            damageCanvas = document.getElementById("damageCanvas");
+            checkCanvas = document.getElementById("checkCanvas");
+
+            if (carImage && damageCanvas && checkCanvas) {
+                damageCtx = damageCanvas.getContext("2d");
+                checkCtx = checkCanvas.getContext("2d");
+
+                carImage.onload = resizeCanvas;
+                window.addEventListener("resize", resizeCanvas);
+
+                damageCanvas.addEventListener("click", (e) => {
+                    if (!checkCtx) return;
+
+                    const rect = damageCanvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const pixel = checkCtx.getImageData(x, y, 1, 1).data;
+                    const alpha = pixel[3];
+
+                    if (alpha > 0) { // Check if the pixel is not transparent
+                        damageCtx.fillStyle = "red";
+                        damageCtx.beginPath();
+                        damageCtx.arc(x, y, 5, 0, Math.PI * 2);
+                        damageCtx.fill();
+
+                        damageMarks.push({ x, y });
+                    }
+                });
+            }
         });
+		function printJobCard(reportData) {
+            // Populate text fields
+            document.getElementById('print-report-date').textContent = new Date(reportData.created_at).toLocaleString();
+            document.getElementById('print-client-name').textContent = reportData.vehicles.client_name || 'N/A';
+            document.getElementById('print-client-phone').textContent = reportData.vehicles.client_phone || 'N/A';
+            document.getElementById('print-executive-name').textContent = reportData.users.username || 'N/A';
+            document.getElementById('print-vehicle-no').textContent = reportData.vehicles.vehicle_no || 'N/A';
+            document.getElementById('print-vehicle-name').textContent = `${reportData.vehicles.vehicle_models.brand} ${reportData.vehicles.vehicle_models.model}`;
+            document.getElementById('print-engine-chassis').textContent = `${reportData.vehicles.engine_no || 'N/A'} / ${reportData.vehicles.chassis_no || 'N/A'}`;
+            document.getElementById('print-odometer').textContent = reportData.vehicles.odometer || 'N/A';
+            
+            // Populate lists
+            const populateList = (listId, dataString) => {
+                const list = document.getElementById(listId);
+                list.innerHTML = '';
+                try {
+                    const items = JSON.parse(dataString);
+                    if (items && items.length > 0) {
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            list.appendChild(li);
+                        });
+                    } else {
+                        list.innerHTML = '<li>N/A</li>';
+                    }
+                } catch(e) {
+                    list.innerHTML = '<li>N/A</li>';
+                }
+            };
+            populateList('print-complaints-list', reportData.complaint);
+            populateList('print-suggested-list', reportData.suggested);
+            populateList('print-approved-list', reportData.approved);
+
+            // Handle the damage marks canvas
+            const printImage = document.getElementById('print-car-image');
+            const printCanvas = document.getElementById('print-damage-canvas');
+            const marksArray = reportData.marks ? JSON.parse(reportData.marks) : [];
+
+            const drawMarksAndPrint = () => {
+                printCanvas.width = printImage.clientWidth;
+                printCanvas.height = printImage.clientHeight;
+                redrawDamageMarks(printCanvas, marksArray);
+                window.print();
+            };
+
+            // Important: We must wait for the image to be loaded before we can draw on the canvas and print.
+            if (printImage.complete) {
+                drawMarksAndPrint();
+            } else {
+                printImage.onload = drawMarksAndPrint;
+            }
+        }
+		function downloadReport() {
+            // Determine which report table is currently visible
+            const isAdminScreenActive = document.getElementById('admin-screens').classList.contains('active-screen');
+            const table = isAdminScreenActive 
+                ? document.querySelector('#admin-reports-screen .report-table') 
+                : document.querySelector('#report-screen .report-table');
+
+            if (!table) {
+                showError('Could not find the report table.');
+                return;
+            }
+
+            const rows = table.querySelectorAll('tr');
+            if (rows.length <= 1) { // Only header row exists
+                showError('No data available to download.');
+                return;
+            }
+
+            let csv = [];
+            
+            // Helper function to format each cell for CSV
+            const formatCell = (cellText) => {
+                let text = cellText.replace(/"/g, '""'); // Escape double quotes
+                if (text.search(/("|,|\n)/g) >= 0) {
+                    text = `"${text}"`; // Enclose in double quotes if it contains quotes, commas, or newlines
+                }
+                return text;
+            };
+
+            // Process header row
+            const headers = [];
+            rows[0].querySelectorAll('th').forEach(th => {
+                headers.push(formatCell(th.textContent.trim()));
+            });
+            csv.push(headers.join(','));
+
+            // Process data rows
+            for (let i = 1; i < rows.length; i++) {
+                const row = [], cols = rows[i].querySelectorAll('td');
+                for (let j = 0; j < cols.length; j++) {
+                    // Skip the last column if it's the "Marks" button
+                    if (j === cols.length - 1 && cols[j].querySelector('button')) {
+                         row.push('See in App');
+                    } else {
+                         row.push(formatCell(cols[j].textContent.trim()));
+                    }
+                }
+                csv.push(row.join(','));
+            }
+
+            // Create CSV file and trigger download
+            const csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
+            const downloadLink = document.createElement('a');
+            
+            const today = new Date().toISOString().slice(0, 10);
+            downloadLink.download = `AutoFix_Report_${today}.csv`;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            showSuccessMessage("Report is downloading...");
+        }
     </script>
+	<script>
+  // Check if the browser supports service workers
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('Service Worker registered successfully:', registration);
+        })
+        .catch(error => {
+          console.log('Service Worker registration failed:', error);
+        });
+    });
+  }
+</script>
+</body>
 </body>
 </html>
-
-
-
