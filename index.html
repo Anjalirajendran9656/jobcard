@@ -1767,8 +1767,13 @@ if (toDate) {
             showSuccessMessage("Report is downloading...");
         }
     </script>
-	
+	<script>
+     if ('serviceWorker' in navigator) {
+       navigator.serviceWorker.register('./sw.js');
+     }
+   </script>
 </body>
 </body>
 </html>
+
 
