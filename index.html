@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-<link rel="manifest" href="manifest.json" />
+
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -247,7 +247,15 @@
                     <div><p class="font-medium text-[var(--text-secondary)]">Chassis No.</p><p id="detail-chassis-no" class="font-semibold"></p></div>
                     <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Client Name</p><p id="detail-client-name" class="font-semibold"></p></div>
                     <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Client Phone</p><p id="detail-client-phone" class="font-semibold"></p></div>
-                    <div class="col-span-2"><p class="font-medium text-[var(--text-secondary)]">Odometer Reading</p><div id="odometer-display-wrapper"><p id="detail-odometer" class="font-semibold"></p></div></div>
+<div class="col-span-2">
+    <div class="flex items-center justify-between mb-1">
+        <p class="font-medium text-[var(--text-secondary)]">Odometer Reading</p>
+        <span id="odometer-warning" class="text-xs text-red-600 font-medium italic hidden"></span>
+    </div>
+    <div id="odometer-display-wrapper">
+        <p id="detail-odometer" class="font-semibold"></p>
+    </div>
+</div>
                 </div></div>
                 
                 <div id="create-vehicle-section" class="card hidden space-y-4">
@@ -308,7 +316,17 @@
         <div id="vehicle-update-screen" class="executive-screen" style="display: none;">
              <main class="app-main">
                 <div class="card relative"><h2 class="text-xl font-bold mb-4">Search Report to Update</h2><input id="update-search-input" onkeyup="handleReportUpdateSearch()" type="text" placeholder="Start typing vehicle number..." class="form-input"><div id="prediction-list" class="absolute top-full left-5 right-5 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden"></div></div>
-                <div id="update-details-section" class="card hidden space-y-4"><h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Selected Report</h2><div class="grid grid-cols-2 gap-4 text-base border-t pt-4"><div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="update-detail-number" class="font-bold text-lg"></p></div><div><p class="font-medium text-[var(--text-secondary)]">Complaint</p><p id="update-detail-complaint" class="font-semibold"></p></div></div></div>
+                <div id="update-details-section" class="card hidden space-y-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2 text-green-600"><span class="material-symbols-outlined">check_circle</span> Selected Report</h2>
+                    <div class="grid grid-cols-2 gap-4 text-base border-t pt-4">
+                        <div><p class="font-medium text-[var(--text-secondary)]">Vehicle Number</p><p id="update-detail-number" class="font-bold text-lg"></p></div>
+                        <div><p class="font-medium text-[var(--text-secondary)]">Total Complaints</p><p id="update-detail-complaint" class="font-semibold"></p></div>
+                    </div>
+                    <div id="original-complaints-display" class="border-t pt-4 hidden">
+                        <h3 class="font-bold text-gray-700 mb-2">Registered Complaints:</h3>
+                        <ul id="original-complaints-list" class="list-disc list-inside text-gray-600 space-y-1"></ul>
+                    </div>
+                </div>
                 <div id="update-form-section" class="card hidden">
                     <form onsubmit="event.preventDefault(); saveVehicleUpdate();" class="space-y-6">
                         <div><label class="form-label">Suggested Repair (from Executive)</label><div class="flex items-center gap-2"><input id="suggestion-input" type="text" class="form-input flex-grow" placeholder="e.g., Change engine oil"><button type="button" onclick="addSuggestion()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200"><span class="material-symbols-outlined">add</span></button></div><div id="executive-suggestions-list" class="mt-3 space-y-2"></div></div>
@@ -784,14 +802,14 @@ const toDate = document.getElementById(isAdmin ? 'admin-filter-to-date' : 'filte
                 }
             }
 
-            let query = sb.from('reports').select(`
-                id, created_at, status, complaint, suggested, approved, marks,
-                vehicles!inner( 
-                    *, 
-                    vehicle_models!inner( brand, model ) 
-                ),
-                users!inner( username )
-            `).order('created_at', { ascending: false });
+let query = sb.from('reports').select(`
+            id, created_at, status, complaint, suggested, approved, marks, odometer_reading, client_name, client_phone,
+            vehicles!inner( 
+                *, 
+                vehicle_models!inner( brand, model ) 
+            ),
+            users!inner( username )
+        `).order('created_at', { ascending: false });
 
             if (vehicleIdFilter !== null) {
                 if (vehicleIdFilter.length === 0) {
@@ -853,9 +871,9 @@ if (toDate) {
                     <td>${row.vehicles.color || 'N/A'}</td>
                     <td>${row.vehicles.engine_no || 'N/A'}</td>
                     <td>${row.vehicles.chassis_no || 'N/A'}</td>
-                    <td>${row.vehicles.client_name || 'N/A'}</td>
-                    <td>${row.vehicles.client_phone || 'N/A'}</td>
-                    <td>${row.vehicles.odometer}</td>
+<td>${row.client_name || 'N/A'}</td>
+<td>${row.client_phone || 'N/A'}</td>
+<td>${row.odometer_reading || 'N/A'}</td>
                     <td>${row.users.username}</td>
                     <td>${new Date(row.created_at).toLocaleString('en-GB')}</td>
                     <td><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[row.status] || 'bg-gray-100 text-gray-800'}">${row.status}</span></td>
@@ -966,7 +984,7 @@ if (toDate) {
                 document.getElementById('detail-chassis-no').textContent = data.chassis_no || 'N/A';
 
                 odometerWrapper.innerHTML = `<input type="number" id="detail-odometer-input" class="form-input" value="${data.odometer}">`;
-                document.getElementById('detail-odometer-input').addEventListener('input', checkOdometer);
+                document.getElementById('detail-odometer-input').addEventListener('blur', checkOdometer);
                 
                 vehicleDetailsSection.classList.remove('hidden');
                 newComplaintSection.classList.remove('hidden');
@@ -1018,12 +1036,21 @@ if (toDate) {
             });
         }
 
-        function checkOdometer() {
-            const newOdometer = document.getElementById('detail-odometer-input').value;
-            if (parseInt(newOdometer) < currentOdometer) {
-                showError('Warning: New reading is lower than the previous one.');
-            }
+	function checkOdometer() {
+        const newOdometerInput = document.getElementById('detail-odometer-input');
+        const warningSpan = document.getElementById('odometer-warning');
+        const newOdometerValue = parseInt(newOdometerInput.value);
+
+        if (newOdometerValue < currentOdometer) {
+            warningSpan.textContent = 'Reading is lower than last service!';
+            warningSpan.classList.remove('hidden');
+            newOdometerInput.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+        } else {
+            warningSpan.textContent = '';
+            warningSpan.classList.add('hidden');
+            newOdometerInput.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
         }
+    }
         
         async function createVehicle() {
             const newVehicle = {
@@ -1091,33 +1118,42 @@ if (toDate) {
             });
         }
 
-        async function saveComplaints() {
+		async function saveComplaints() {
             addComplaint(); 
             
             if (currentComplaints.length === 0) return showError('Please add at least one complaint.');
             if (!currentVehicleId) return showError('No vehicle selected.');
             
             const newOdometerInput = document.getElementById('detail-odometer-input');
-            const newOdometerValue = newOdometerInput ? newOdometerInput.value : null;
+            const serviceOdometer = newOdometerInput ? newOdometerInput.value : currentOdometer;
 
-            if (newOdometerValue && parseInt(newOdometerValue) !== currentOdometer) {
-                const { error: odometerError } = await sb
-                    .from('vehicles')
-                    .update({ odometer: newOdometerValue })
-                    .eq('id', currentVehicleId);
-                if (odometerError) return showError('Failed to update odometer reading.');
-            }
-            
+            // Get the current client details directly from the displayed vehicle info
+            const serviceClientName = document.getElementById('detail-client-name').textContent;
+            const serviceClientPhone = document.getElementById('detail-client-phone').textContent;
+
+            // --- THIS IS THE KEY CHANGE ---
             const newReport = {
                 vehicle_id: currentVehicleId,
                 executive_id: currentUser.id,
                 complaint: JSON.stringify(currentComplaints),
                 status: 'Not Started',
-                marks: JSON.stringify(damageMarks)
+                marks: JSON.stringify(damageMarks),
+                // Save a snapshot of the vehicle's state at the time of service
+                odometer_reading: serviceOdometer,
+                client_name: serviceClientName,
+                client_phone: serviceClientPhone
             };
 
             const { error } = await sb.from('reports').insert(newReport);
-            if(error) return showError(`Failed to save complaints: ${error.message}`);
+            if(error) {
+                console.error("Error saving report:", error);
+                return showError(`Failed to save complaints: ${error.message}`);
+            }
+            
+            // Now, update the main vehicle record's odometer only if it's a higher value
+            if (parseInt(serviceOdometer) > currentOdometer) {
+                 await sb.from('vehicles').update({ odometer: serviceOdometer }).eq('id', currentVehicleId);
+            }
             
             showSuccessMessage('Report saved successfully!');
             resetJobCardState();
@@ -1156,28 +1192,46 @@ if (toDate) {
         }
 
         function selectReportForUpdate(report) {
-    currentReportId = report.id;
-    document.getElementById('update-search-input').value = report.vehicles.vehicle_no;
-    predictionList.classList.add('hidden');
-    document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
-    document.getElementById('update-detail-complaint').textContent = formatArrayCell(report.complaint);
-    updateDetailsSection.classList.remove('hidden');
-    updateFormSection.classList.remove('hidden');
+            currentReportId = report.id;
+            document.getElementById('update-search-input').value = report.vehicles.vehicle_no;
+            predictionList.classList.add('hidden');
+            document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
+            updateDetailsSection.classList.remove('hidden');
+            updateFormSection.classList.remove('hidden');
 
-    // Store original complaints and reset new suggestions
-    try {
-        originalComplaintsForUpdate = JSON.parse(report.complaint || '[]');
-    } catch (e) {
-        console.error("Could not parse complaints:", e);
-        originalComplaintsForUpdate = [];
-    }
-    newSuggestions = []; // Reset new suggestions for the new report
+            // Store original complaints and reset new suggestions
+            try {
+                originalComplaintsForUpdate = JSON.parse(report.complaint || '[]');
+            } catch (e) {
+                console.error("Could not parse complaints:", e);
+                originalComplaintsForUpdate = [];
+            }
+            newSuggestions = []; // Reset new suggestions for the new report
+            
+            // Populate the display list for original complaints
+            const complaintDisplayList = document.getElementById('original-complaints-list');
+            const complaintSummaryP = document.getElementById('update-detail-complaint');
+            const complaintDisplayDiv = document.getElementById('original-complaints-display');
+            complaintDisplayList.innerHTML = '';
+            
+            if (originalComplaintsForUpdate.length > 0) {
+                complaintSummaryP.textContent = `${originalComplaintsForUpdate.length} issue(s) registered.`;
+                originalComplaintsForUpdate.forEach(complaint => {
+                    const li = document.createElement('li');
+                    li.textContent = complaint;
+                    complaintDisplayList.appendChild(li);
+                });
+                complaintDisplayDiv.classList.remove('hidden');
+            } else {
+                 complaintSummaryP.textContent = 'No complaints registered.';
+                 complaintDisplayDiv.classList.add('hidden');
+            }
 
-    renderSuggestions();
+            renderSuggestions(); // This will still populate the checkboxes
 
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('delivery-date').setAttribute('min', today);
-}
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('delivery-date').setAttribute('min', today);
+        }
 
         function addSuggestion() {
     const input = document.getElementById('suggestion-input');
@@ -1190,44 +1244,44 @@ if (toDate) {
 }
 
         function renderSuggestions() {
-    const executiveList = document.getElementById('executive-suggestions-list');
-    const customerList = document.getElementById('customer-approval-list');
-    executiveList.innerHTML = '';
-    customerList.innerHTML = '';
+            const executiveList = document.getElementById('executive-suggestions-list');
+            const customerList = document.getElementById('customer-approval-list');
+            executiveList.innerHTML = '';
+            customerList.innerHTML = '';
 
-    // Part 1: Render original complaints as non-selectable items in the customer list
-    if (originalComplaintsForUpdate.length > 0) {
-        originalComplaintsForUpdate.forEach(text => {
-            const customerItem = document.createElement('label');
-            customerItem.className = 'flex items-center gap-3 p-3 bg-gray-100 rounded-lg cursor-not-allowed opacity-75';
-            // Checkbox is checked and disabled for reference
-            customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-gray-400 focus:ring-0" checked disabled><span class="flex-1">${text}</span>`;
-            customerList.appendChild(customerItem);
-        });
-    }
+            // Part 1: Render original complaints as selectable items for approval
+            if (originalComplaintsForUpdate.length > 0) {
+                originalComplaintsForUpdate.forEach(text => {
+                    const customerItem = document.createElement('label');
+                    customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
+                    // Checkbox is now enabled to allow ticking
+                    customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
+                    customerList.appendChild(customerItem);
+                });
+            }
 
-    // Part 2: Render NEW suggestions from the executive
-    if (newSuggestions.length > 0) {
-        newSuggestions.forEach(text => {
-            // Add to the executive's view-only list
-            const execItem = document.createElement('div');
-            execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
-            execItem.textContent = text;
-            executiveList.appendChild(execItem);
+            // Part 2: Render NEW suggestions from the executive
+            if (newSuggestions.length > 0) {
+                newSuggestions.forEach(text => {
+                    // Add to the executive's view-only list
+                    const execItem = document.createElement('div');
+                    execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
+                    execItem.textContent = text;
+                    executiveList.appendChild(execItem);
 
-            // Add as a selectable checkbox to the customer's approval list
-            const customerItem = document.createElement('label');
-            customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
-            customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
-            customerList.appendChild(customerItem);
-        });
-    }
+                    // Add as a selectable checkbox to the customer's approval list
+                    const customerItem = document.createElement('label');
+                    customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
+                    customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
+                    customerList.appendChild(customerItem);
+                });
+            }
 
-    // Handle empty state for customer approval list
-    if (customerList.innerHTML === '') {
-        customerList.innerHTML = '<p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p>';
-    }
-}
+            // Handle empty state for customer approval list
+            if (customerList.innerHTML === '') {
+                customerList.innerHTML = '<p class="text-sm text-gray-500">Add suggestions above to see them here for approval.</p>';
+            }
+        }
         
         async function saveVehicleUpdate() {
     if(!currentReportId) return showError('No report selected for update.');
@@ -1236,8 +1290,8 @@ if (toDate) {
     if(!deliveryDate) return showError('Please select an expected delivery date.');
 
     const approvedItems = [];
-    // Important: Select only checkboxes that are checked but NOT disabled
-    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked:not(:disabled)').forEach(checkbox => {
+    // Important: Select all checked checkboxes, as none are disabled now
+    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
         approvedItems.push(checkbox.nextElementSibling.textContent);
     });
 
@@ -1649,16 +1703,19 @@ if (toDate) {
                 });
             }
         });
-		function printJobCard(reportData) {
+		
+        // --- MODIFIED PRINT FUNCTION ---
+        function printJobCard(reportData) {
             // Populate text fields
             document.getElementById('print-report-date').textContent = new Date(reportData.created_at).toLocaleString();
-            document.getElementById('print-client-name').textContent = reportData.vehicles.client_name || 'N/A';
-            document.getElementById('print-client-phone').textContent = reportData.vehicles.client_phone || 'N/A';
             document.getElementById('print-executive-name').textContent = reportData.users.username || 'N/A';
             document.getElementById('print-vehicle-no').textContent = reportData.vehicles.vehicle_no || 'N/A';
             document.getElementById('print-vehicle-name').textContent = `${reportData.vehicles.vehicle_models.brand} ${reportData.vehicles.vehicle_models.model}`;
             document.getElementById('print-engine-chassis').textContent = `${reportData.vehicles.engine_no || 'N/A'} / ${reportData.vehicles.chassis_no || 'N/A'}`;
-            document.getElementById('print-odometer').textContent = reportData.vehicles.odometer || 'N/A';
+			document.getElementById('print-client-name').textContent = reportData.client_name || 'N/A';
+			document.getElementById('print-client-phone').textContent = reportData.client_phone || 'N/A';
+			document.getElementById('print-odometer').textContent = reportData.odometer_reading || 'N/A';
+
             
             // Populate lists
             const populateList = (listId, dataString) => {
@@ -1689,19 +1746,41 @@ if (toDate) {
             const marksArray = reportData.marks ? JSON.parse(reportData.marks) : [];
 
             const drawMarksAndPrint = () => {
-                printCanvas.width = printImage.clientWidth;
-                printCanvas.height = printImage.clientHeight;
-                redrawDamageMarks(printCanvas, marksArray);
+                // 1. Define source dimensions (from the on-screen canvas where marks were made)
+                const sourceWidth = 384; // Corresponds to Tailwind's `max-w-sm` class
+                const aspectRatio = printImage.naturalWidth / printImage.naturalHeight;
+                const sourceHeight = sourceWidth / aspectRatio;
+
+                // 2. Define destination dimensions (for the canvas in the print layout)
+                const destWidth = 400; // Corresponds to `max-width: 400px` in the print CSS
+                const destHeight = destWidth / aspectRatio;
+                
+                printCanvas.width = destWidth;
+                printCanvas.height = destHeight;
+
+                // 3. Calculate the scaling ratios
+                const widthRatio = destWidth / sourceWidth;
+                const heightRatio = destHeight / sourceHeight;
+
+                // 4. Create a new array of marks with scaled coordinates
+                const scaledMarks = marksArray.map(mark => ({
+                    x: mark.x * widthRatio,
+                    y: mark.y * heightRatio
+                }));
+
+                // 5. Draw the newly scaled marks onto the print canvas and then trigger the print dialog
+                redrawDamageMarks(printCanvas, scaledMarks);
                 window.print();
             };
 
-            // Important: We must wait for the image to be loaded before we can draw on the canvas and print.
+            // We must wait for the image to be loaded to get its dimensions before we can calculate the scaling
             if (printImage.complete) {
                 drawMarksAndPrint();
             } else {
                 printImage.onload = drawMarksAndPrint;
             }
         }
+
 		function downloadReport() {
             // Determine which report table is currently visible
             const isAdminScreenActive = document.getElementById('admin-screens').classList.contains('active-screen');
@@ -1766,23 +1845,6 @@ if (toDate) {
             
             showSuccessMessage("Report is downloading...");
         }
-   // </script>
-	//<script>
-   if ('serviceWorker' in navigator) {
-     window.addEventListener('load', () => {
-       navigator.serviceWorker.register('/sw.js')
-         .then(registration => {
-           console.log('Service Worker registered successfully:', registration);
-         })
-         .catch(error => {
-           console.log('Service Worker registration failed:', error);
-         });
-     });
-   }
-   </script>
-</body>
+    </script>
 </body>
 </html>
-
-
-
