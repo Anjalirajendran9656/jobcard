@@ -1795,70 +1795,66 @@ function deleteSuggestion(index) {
         }
 
 		function downloadReport() {
-            const isAdminScreenActive = document.getElementById('admin-screens').classList.contains('active-screen');
-            const table = isAdminScreenActive 
-                ? document.querySelector('#admin-reports-screen .report-table') 
-                : document.querySelector('#report-screen .report-table');
+    // This now refers to the main download button, not individual ones.
+    const isAdminScreenActive = document.getElementById('admin-screens').classList.contains('active-screen');
+    const table = isAdminScreenActive 
+        ? document.querySelector('#admin-reports-screen .report-table') 
+        : document.querySelector('#report-screen .report-table');
 
-            if (!table) {
-                showError('Could not find the report table.');
-                return;
-            }
+    if (!table) {
+        showError('Could not find the report table.');
+        return;
+    }
 
-            const rows = table.querySelectorAll('tr');
-            if (rows.length <= 1) { 
-                showError('No data available to download.');
-                return;
-            }
+    const rows = table.querySelectorAll('tr');
+    if (rows.length <= 1) { 
+        showError('No data available to download.');
+        return;
+    }
 
-            let csv = [];
-            
-            const formatCell = (cellText) => {
-                let text = cellText.replace(/"/g, '""');
-                if (text.search(/("|,|\n)/g) >= 0) {
-                    text = `"${text}"`;
-                }
-                return text;
-            };
-
-            const headers = [];
-            rows[0].querySelectorAll('th').forEach(th => {
-                if (th.textContent.trim() !== "Download") {
-                    headers.push(formatCell(th.textContent.trim()));
-                }
-            });
-            csv.push(headers.join(','));
-
-            for (let i = 1; i < rows.length; i++) {
-                const row = [], cols = rows[i].querySelectorAll('td');
-                for (let j = 0; j < cols.length; j++) {
-                    if (j === 0) { // The first column with the button
-                        row.push(formatCell(cols[j].querySelector('span:last-child').textContent.trim()));
-                        continue;
-                    }
-                    if (cols[j].querySelector('button')) {
-                         row.push('See in App');
-                    } else {
-                         row.push(formatCell(cols[j].textContent.trim()));
-                    }
-                }
-                csv.push(row.join(','));
-            }
-
-            const csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
-            const downloadLink = document.createElement('a');
-            
-            const today = new Date().toISOString().slice(0, 10);
-            downloadLink.download = `AutoFix_Report_${today}.csv`;
-            downloadLink.href = window.URL.createObjectURL(csvFile);
-            downloadLink.style.display = 'none';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            showSuccessMessage("Report is downloading...");
+    let csv = [];
+    
+    const formatCell = (cellText) => {
+        let text = cellText.replace(/"/g, '""');
+        if (text.search(/("|,|\n)/g) >= 0) {
+            text = `"${text}"`;
         }
+        return text;
+    };
+
+    const headers = [];
+    rows[0].querySelectorAll('th').forEach(th => {
+        headers.push(formatCell(th.textContent.trim()));
+    });
+    csv.push(headers.join(','));
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = [], cols = rows[i].querySelectorAll('td');
+        for (let j = 0; j < cols.length; j++) {
+            if (j === 0) { 
+                row.push(formatCell(cols[j].querySelector('span:last-child').textContent.trim()));
+            } else if (cols[j].querySelector('button')) {
+                 row.push('See in App');
+            } else {
+                 row.push(formatCell(cols[j].textContent.trim()));
+            }
+        }
+        csv.push(row.join(','));
+    }
+
+    const csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const downloadLink = document.createElement('a');
+    
+    const today = new Date().toISOString().slice(0, 10);
+    downloadLink.download = `AutoFix_Report_${today}.csv`;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = 'none';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    
+    showSuccessMessage("Report is downloading...");
+}
     </script>
 </body>
 </html>
-
