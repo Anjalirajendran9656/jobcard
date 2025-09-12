@@ -13,6 +13,9 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 
     <style type="text/tailwindcss">
         :root {
@@ -263,16 +266,19 @@
                     <p class="text-sm text-gray-500 -mt-2">Vehicle not found. Please add the details below to register it.</p>
                     <form id="create-vehicle-form" onsubmit="event.preventDefault(); createVehicle();" class="border-t pt-4"><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="form-label">Vehicle Number</label><input id="new-vehicle-number" type="text" class="form-input bg-gray-100" readonly></div>
-                    <div><label class="form-label">Vehicle Name</label><input id="new-vehicle-name" type="text" class="form-input" placeholder="e.g., Swift VXI" required></div>
+                    <div><label class="form-label">Vehicle Name</label><input id="new-vehicle-name" type="text" class="form-input" placeholder="e.g., Swift VXI" ></div>
                     <div><label class="form-label">Brand</label><select id="new-vehicle-brand-exec" class="form-input" required onchange="populateModelDropdown()"></select></div>
                     <div><label class="form-label">Model</label><select id="new-vehicle-model-exec" class="form-input" required></select></div>
-                    <div><label class="form-label">Color</label><input id="new-color" type="text" class="form-input" placeholder="e.g., White" required></div>
-                    <div><label class="form-label">Fuel Type</label><select id="new-fuel-type" class="form-input" required><option value="">Select Type</option><option>Petrol</option><option>Diesel</option></select></div>
+                    <div><label class="form-label">Color</label><input id="new-color" type="text" class="form-input" placeholder="e.g., White" ></div>
+                    <div><label class="form-label">Fuel Type</label><select id="new-fuel-type" class="form-input" required><option value="">Select Type</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
                     <div><label class="form-label">Engine Number</label><input id="new-engine-no" type="text" class="form-input" placeholder="Enter engine number" required></div>
                     <div><label class="form-label">Chassis Number</label><input id="new-chassis-no" type="text" class="form-input" placeholder="Enter chassis number" required></div>
                     <div class="sm:col-span-2"><label class="form-label">Odometer Reading (km)</label><input id="new-odometer" type="number" class="form-input" placeholder="e.g., 54000" required></div>
                     <div class="sm:col-span-2 border-t pt-4"><label class="form-label">Client Name</label><input id="new-client-name" type="text" class="form-input" placeholder="e.g., John Doe" required></div>
-                    <div class="sm:col-span-2"><label class="form-label">Client Phone</label><input id="new-client-phone" type="tel" class="form-input" placeholder="e.g., 9876543210" required></div>
+<div class="sm:col-span-2">
+    <label class="form-label">Client Phone</label>
+    <input id="new-client-phone" type="tel" class="form-input" placeholder="e.g., 9876543210" required maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+</div>
                 </div><div class="mt-6"><button type="submit" class="btn-primary"><span class="material-symbols-outlined">save</span>Save Vehicle</button></div></form></div>
                 
                 <div id="new-complaint-section" class="card hidden">
@@ -603,6 +609,7 @@
         // --- Global State ---
         let currentUser = null;
         let vehicleModelsCache = [];
+        let reportsDataStore = {};
         let currentVehicleId = null;
         let currentReportId = null;
         let originalComplaintsForUpdate = [];
@@ -622,19 +629,17 @@
         const normalizeVehicleNumber = (num) => {
             if (!num) return '';
             const cleanedNum = num.replace(/[\s-/]/g, '').toUpperCase();
-            // Match formats like KL7... or KL07...
             const match = cleanedNum.match(/^([A-Z]{2})(\d{1,2})(.*)$/);
             if (match) {
                 const stateCode = match[1];
                 let rtoCode = match[2];
                 const rest = match[3];
-                // If the RTO code is a single digit, pad it with a leading zero
                 if (rtoCode.length === 1) {
                     rtoCode = '0' + rtoCode;
                 }
                 return `${stateCode}${rtoCode}${rest}`;
             }
-            return cleanedNum; // Return the cleaned number if it doesn't match the pattern
+            return cleanedNum;
         };
 
         async function login() {
@@ -642,16 +647,12 @@
             const password = document.getElementById('password').value.trim();
             if (!username || !password) return showError('Username and password are required.');
 
-            // Step 1: Find a user with a case-insensitive username match.
-            // This is robust against database collations (e.g., citext) that might be case-insensitive.
             const { data, error } = await sb
                 .from('users')
                 .select('*')
-                .ilike('username', username) // Use case-insensitive search to find the user row
-                .single(); // Assumes usernames that differ only by case are unique in the DB
+                .ilike('username', username)
+                .single();
 
-            // Step 2: Perform a strict, case-sensitive check on both username and password in JavaScript.
-            // This ensures that 'Admin' and 'admin' are treated as different users.
             if (error || !data || data.password.toLowerCase() !== password.toLowerCase()) {
     	    return showError('Invalid credentials.');
            }
@@ -769,7 +770,7 @@ function handleDateChange(fromId, toId) {
             const noReportsMsg = document.getElementById(noReportsMsgId);
 
            const fromDate = document.getElementById(isAdmin ? 'admin-filter-from-date' : 'filter-from-date').value;
-const toDate = document.getElementById(isAdmin ? 'admin-filter-to-date' : 'filter-to-date').value;
+            const toDate = document.getElementById(isAdmin ? 'admin-filter-to-date' : 'filter-to-date').value;
             
             const vehicleNo = document.getElementById(isAdmin ? 'admin-filter-vehicle-no' : 'filter-vehicle-no').value.trim().toUpperCase();
             const brand = document.getElementById(isAdmin ? 'admin-filter-brand' : 'filter-brand').value.trim();
@@ -802,14 +803,14 @@ const toDate = document.getElementById(isAdmin ? 'admin-filter-to-date' : 'filte
                 }
             }
 
-let query = sb.from('reports').select(`
-            id, created_at, status, complaint, suggested, approved, marks, odometer_reading, client_name, client_phone,
-            vehicles!inner( 
-                *, 
-                vehicle_models!inner( brand, model ) 
-            ),
-            users!inner( username )
-        `).order('created_at', { ascending: false });
+            let query = sb.from('reports').select(`
+                id, created_at, status, complaint, suggested, approved, marks, odometer_reading, client_name, client_phone,
+                vehicles!inner( 
+                    *, 
+                    vehicle_models!inner( brand, model ) 
+                ),
+                users!inner( username )
+            `).order('created_at', { ascending: false });
 
             if (vehicleIdFilter !== null) {
                 if (vehicleIdFilter.length === 0) {
@@ -835,11 +836,11 @@ let query = sb.from('reports').select(`
             }
 
             if (fromDate) {
-    query = query.gte('created_at', `${fromDate}T00:00:00`);
-}
-if (toDate) {
-    query = query.lte('created_at', `${toDate}T23:59:59`);
-}
+                query = query.gte('created_at', `${fromDate}T00:00:00`);
+            }
+            if (toDate) {
+                query = query.lte('created_at', `${toDate}T23:59:59`);
+            }
            
 
             const { data, error } = await query;
@@ -847,6 +848,12 @@ if (toDate) {
                 console.error('Filter Error:', error);
                 return showError('Failed to fetch filtered reports.');
             }
+            
+            reportsDataStore = {};
+            data.forEach(row => {
+                reportsDataStore[row.id] = row;
+            });
+
 
             tableBody.innerHTML = '';
             if (data.length === 0) {
@@ -864,16 +871,19 @@ if (toDate) {
                 }
 
                 tr.innerHTML = `
-                    <td>${row.vehicles.vehicle_no}</td>
+                    <td class="flex items-center gap-x-2">
+                        <button onclick='printJobCardById(${row.id})' class="text-gray-500 hover:text-green-600 p-1 rounded-full shrink-0"><span class="material-symbols-outlined">download</span></button>
+                        <span>${row.vehicles.vehicle_no}</span>
+                    </td>
                     <td>${row.vehicles.vehicle_name || 'N/A'}</td>
                     <td>${row.vehicles.vehicle_models.model}</td>
                     <td>${row.vehicles.vehicle_models.brand}</td>
                     <td>${row.vehicles.color || 'N/A'}</td>
                     <td>${row.vehicles.engine_no || 'N/A'}</td>
                     <td>${row.vehicles.chassis_no || 'N/A'}</td>
-<td>${row.client_name || 'N/A'}</td>
-<td>${row.client_phone || 'N/A'}</td>
-<td>${row.odometer_reading || 'N/A'}</td>
+                    <td>${row.client_name || 'N/A'}</td>
+                    <td>${row.client_phone || 'N/A'}</td>
+                    <td>${row.odometer_reading || 'N/A'}</td>
                     <td>${row.users.username}</td>
                     <td>${new Date(row.created_at).toLocaleString('en-GB')}</td>
                     <td><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[row.status] || 'bg-gray-100 text-gray-800'}">${row.status}</span></td>
@@ -882,20 +892,24 @@ if (toDate) {
                     <td class="whitespace-normal max-w-xs truncate" title="${formatArrayCell(row.approved)}">${formatArrayCell(row.approved)}</td>
                     <td>${marksButton}</td>
                 `;
-				tr.ondblclick = () => printJobCard(row); // Add this line
                 tableBody.appendChild(tr);
             });
         }
         
         function applyAdminReportFilters() { fetchAndPopulateReports(true); }
-       function clearReportFilters() { 
-    document.getElementById('report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); 
-    document.getElementById('filter-to-date').min = '';
-    document.getElementById('filter-from-date').max = '';
-    fetchAndPopulateReports(false); 
-}
+       function clearAdminReportFilters() { 
+            document.getElementById('admin-report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); 
+            document.getElementById('admin-filter-to-date').min = '';
+            document.getElementById('admin-filter-from-date').max = '';
+            fetchAndPopulateReports(true); 
+        }
         function applyReportFilters() { fetchAndPopulateReports(false); }
-        function clearReportFilters() { document.getElementById('report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); fetchAndPopulateReports(false); }
+        function clearReportFilters() { 
+            document.getElementById('report-filters').querySelectorAll('input, select').forEach(input => input.value = ''); 
+            document.getElementById('filter-to-date').min = '';
+            document.getElementById('filter-from-date').max = '';
+            fetchAndPopulateReports(false); 
+        }
 
 
         async function renderAnalytics() {
@@ -989,7 +1003,6 @@ if (toDate) {
                 vehicleDetailsSection.classList.remove('hidden');
                 newComplaintSection.classList.remove('hidden');
 
-                // FIX: Resize canvas now that it's visible
                 setTimeout(resizeCanvas, 50);
 
             } else { 
@@ -1066,8 +1079,11 @@ if (toDate) {
                 client_phone: document.getElementById('new-client-phone').value.trim()
             };
 
-            if (!newVehicle.model_id || !newVehicle.fuel_type || !newVehicle.odometer || !newVehicle.client_name || !newVehicle.client_phone || !newVehicle.vehicle_name || !newVehicle.color || !newVehicle.engine_no || !newVehicle.chassis_no) {
-                return showError('Please fill all vehicle details.');
+            if (!newVehicle.model_id || !newVehicle.fuel_type || !newVehicle.odometer || !newVehicle.client_name || !newVehicle.client_phone || !newVehicle.engine_no || !newVehicle.chassis_no) {
+                return showError('Please fill all mandatory vehicle details.');
+            }
+            if (!/^\d{10}$/.test(newVehicle.client_phone)) {
+                return showError('Please enter a valid 10-digit phone number.');
             }
 
             const { data, error } = await sb.from('vehicles').insert(newVehicle).select().single();
@@ -1127,18 +1143,15 @@ if (toDate) {
             const newOdometerInput = document.getElementById('detail-odometer-input');
             const serviceOdometer = newOdometerInput ? newOdometerInput.value : currentOdometer;
 
-            // Get the current client details directly from the displayed vehicle info
             const serviceClientName = document.getElementById('detail-client-name').textContent;
             const serviceClientPhone = document.getElementById('detail-client-phone').textContent;
 
-            // --- THIS IS THE KEY CHANGE ---
             const newReport = {
                 vehicle_id: currentVehicleId,
                 executive_id: currentUser.id,
                 complaint: JSON.stringify(currentComplaints),
                 status: 'Not Started',
                 marks: JSON.stringify(damageMarks),
-                // Save a snapshot of the vehicle's state at the time of service
                 odometer_reading: serviceOdometer,
                 client_name: serviceClientName,
                 client_phone: serviceClientPhone
@@ -1150,7 +1163,6 @@ if (toDate) {
                 return showError(`Failed to save complaints: ${error.message}`);
             }
             
-            // Now, update the main vehicle record's odometer only if it's a higher value
             if (parseInt(serviceOdometer) > currentOdometer) {
                  await sb.from('vehicles').update({ odometer: serviceOdometer }).eq('id', currentVehicleId);
             }
@@ -1199,16 +1211,14 @@ if (toDate) {
             updateDetailsSection.classList.remove('hidden');
             updateFormSection.classList.remove('hidden');
 
-            // Store original complaints and reset new suggestions
             try {
                 originalComplaintsForUpdate = JSON.parse(report.complaint || '[]');
             } catch (e) {
                 console.error("Could not parse complaints:", e);
                 originalComplaintsForUpdate = [];
             }
-            newSuggestions = []; // Reset new suggestions for the new report
+            newSuggestions = []; 
             
-            // Populate the display list for original complaints
             const complaintDisplayList = document.getElementById('original-complaints-list');
             const complaintSummaryP = document.getElementById('update-detail-complaint');
             const complaintDisplayDiv = document.getElementById('original-complaints-display');
@@ -1227,21 +1237,25 @@ if (toDate) {
                  complaintDisplayDiv.classList.add('hidden');
             }
 
-            renderSuggestions(); // This will still populate the checkboxes
+            renderSuggestions();
 
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('delivery-date').setAttribute('min', today);
         }
 
         function addSuggestion() {
-    const input = document.getElementById('suggestion-input');
-    const suggestionText = input.value.trim();
-    if (suggestionText) {
-        newSuggestions.push(suggestionText); // Changed to push to newSuggestions
-        input.value = '';
-        renderSuggestions();
-    }
-}
+            const input = document.getElementById('suggestion-input');
+            const suggestionText = input.value.trim();
+            if (suggestionText) {
+                newSuggestions.push(suggestionText);
+                input.value = '';
+                renderSuggestions();
+            }
+        }
+function deleteSuggestion(index) {
+            newSuggestions.splice(index, 1);
+            renderSuggestions();
+        }
 
         function renderSuggestions() {
             const executiveList = document.getElementById('executive-suggestions-list');
@@ -1254,7 +1268,6 @@ if (toDate) {
                 originalComplaintsForUpdate.forEach(text => {
                     const customerItem = document.createElement('label');
                     customerItem.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
-                    // Checkbox is now enabled to allow ticking
                     customerItem.innerHTML = `<input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span class="flex-1">${text}</span>`;
                     customerList.appendChild(customerItem);
                 });
@@ -1262,11 +1275,16 @@ if (toDate) {
 
             // Part 2: Render NEW suggestions from the executive
             if (newSuggestions.length > 0) {
-                newSuggestions.forEach(text => {
-                    // Add to the executive's view-only list
+                newSuggestions.forEach((text, index) => {
+                    // Add to the executive's list WITH a delete button
                     const execItem = document.createElement('div');
-                    execItem.className = 'bg-blue-50 text-blue-800 p-2 rounded-lg text-sm';
-                    execItem.textContent = text;
+                    execItem.className = 'flex items-center justify-between bg-blue-50 p-2 rounded-lg text-sm text-blue-800';
+                    execItem.innerHTML = `
+                        <p class="flex-1 mr-2">${text}</p>
+                        <button type="button" onclick="deleteSuggestion(${index})" class="text-red-500 hover:text-red-700 shrink-0">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    `;
                     executiveList.appendChild(execItem);
 
                     // Add as a selectable checkbox to the customer's approval list
@@ -1284,33 +1302,31 @@ if (toDate) {
         }
         
         async function saveVehicleUpdate() {
-    if(!currentReportId) return showError('No report selected for update.');
+            if(!currentReportId) return showError('No report selected for update.');
 
-    const deliveryDate = document.getElementById('delivery-date').value;
-    if(!deliveryDate) return showError('Please select an expected delivery date.');
+            const deliveryDate = document.getElementById('delivery-date').value;
+            if(!deliveryDate) return showError('Please select an expected delivery date.');
 
-    const approvedItems = [];
-    // Important: Select all checked checkboxes, as none are disabled now
-    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
-        approvedItems.push(checkbox.nextElementSibling.textContent);
-    });
+            const approvedItems = [];
+            document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
+                approvedItems.push(checkbox.nextElementSibling.textContent);
+            });
 
-    // Combine original complaints and new executive suggestions for the "suggested" field
-    const allSuggestions = [...originalComplaintsForUpdate, ...newSuggestions];
+            const allSuggestions = [...originalComplaintsForUpdate, ...newSuggestions];
 
-    const updateData = {
-        suggested: JSON.stringify(allSuggestions),
-        approved: JSON.stringify(approvedItems),
-        expected_delivery: deliveryDate,
-        status: 'Ongoing'
-    };
+            const updateData = {
+                suggested: JSON.stringify(allSuggestions),
+                approved: JSON.stringify(approvedItems),
+                expected_delivery: deliveryDate,
+                status: 'Ongoing'
+            };
 
-    const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
-    if(error) return showError(`Failed to save update: ${error.message}`);
+            const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
+            if(error) return showError(`Failed to save update: ${error.message}`);
 
-    showSuccessMessage('Update saved successfully!');
-    resetVehicleUpdateScreen();
-}
+            showSuccessMessage('Update saved successfully!');
+            resetVehicleUpdateScreen();
+        }
         
         // --- EXECUTIVE: DUE DATES ---
         async function populateDueDateScreen() {
@@ -1520,7 +1536,7 @@ if (toDate) {
             updateDetailsSection.classList.add('hidden');
             updateFormSection.classList.add('hidden');
             document.getElementById('delivery-date').value = '';
-            currentSuggestions = [];
+            newSuggestions = [];
             currentReportId = null;
             renderSuggestions();
         }
@@ -1543,15 +1559,13 @@ if (toDate) {
                 redrawDamageMarks(damageCanvas, damageMarks);
             };
 
-            // Use requestAnimationFrame to wait for the browser to be ready to paint
             requestAnimationFrame(redraw);
         }
 
-        // ADDED: New function to undo the last mark
         function undoLastMark() {
             if (damageMarks.length > 0) {
-                damageMarks.pop(); // Remove the last element from the array
-                redrawDamageMarks(damageCanvas, damageMarks); // Redraw the canvas without the last mark
+                damageMarks.pop();
+                redrawDamageMarks(damageCanvas, damageMarks);
             }
         }
 
@@ -1670,7 +1684,6 @@ if (toDate) {
                 }
             }
 
-            // --- Damage Canvas Setup ---
             carImage = document.getElementById("carImage");
             damageCanvas = document.getElementById("damageCanvas");
             checkCanvas = document.getElementById("checkCanvas");
@@ -1692,7 +1705,7 @@ if (toDate) {
                     const pixel = checkCtx.getImageData(x, y, 1, 1).data;
                     const alpha = pixel[3];
 
-                    if (alpha > 0) { // Check if the pixel is not transparent
+                    if (alpha > 0) {
                         damageCtx.fillStyle = "red";
                         damageCtx.beginPath();
                         damageCtx.arc(x, y, 5, 0, Math.PI * 2);
@@ -1704,9 +1717,17 @@ if (toDate) {
             }
         });
 		
-        // --- MODIFIED PRINT FUNCTION ---
+        function printJobCardById(reportId) {
+            const reportData = reportsDataStore[reportId];
+            if (reportData) {
+                printJobCard(reportData);
+            } else {
+                console.error(`Report data not found for ID: ${reportId}`);
+                showError("Could not find report data to print.");
+            }
+        }
+
         function printJobCard(reportData) {
-            // Populate text fields
             document.getElementById('print-report-date').textContent = new Date(reportData.created_at).toLocaleString();
             document.getElementById('print-executive-name').textContent = reportData.users.username || 'N/A';
             document.getElementById('print-vehicle-no').textContent = reportData.vehicles.vehicle_no || 'N/A';
@@ -1717,7 +1738,6 @@ if (toDate) {
 			document.getElementById('print-odometer').textContent = reportData.odometer_reading || 'N/A';
 
             
-            // Populate lists
             const populateList = (listId, dataString) => {
                 const list = document.getElementById(listId);
                 list.innerHTML = '';
@@ -1740,40 +1760,33 @@ if (toDate) {
             populateList('print-suggested-list', reportData.suggested);
             populateList('print-approved-list', reportData.approved);
 
-            // Handle the damage marks canvas
             const printImage = document.getElementById('print-car-image');
             const printCanvas = document.getElementById('print-damage-canvas');
             const marksArray = reportData.marks ? JSON.parse(reportData.marks) : [];
 
             const drawMarksAndPrint = () => {
-                // 1. Define source dimensions (from the on-screen canvas where marks were made)
-                const sourceWidth = 384; // Corresponds to Tailwind's `max-w-sm` class
+                const sourceWidth = 384; 
                 const aspectRatio = printImage.naturalWidth / printImage.naturalHeight;
                 const sourceHeight = sourceWidth / aspectRatio;
 
-                // 2. Define destination dimensions (for the canvas in the print layout)
-                const destWidth = 400; // Corresponds to `max-width: 400px` in the print CSS
+                const destWidth = 400;
                 const destHeight = destWidth / aspectRatio;
                 
                 printCanvas.width = destWidth;
                 printCanvas.height = destHeight;
 
-                // 3. Calculate the scaling ratios
                 const widthRatio = destWidth / sourceWidth;
                 const heightRatio = destHeight / sourceHeight;
 
-                // 4. Create a new array of marks with scaled coordinates
                 const scaledMarks = marksArray.map(mark => ({
                     x: mark.x * widthRatio,
                     y: mark.y * heightRatio
                 }));
 
-                // 5. Draw the newly scaled marks onto the print canvas and then trigger the print dialog
                 redrawDamageMarks(printCanvas, scaledMarks);
                 window.print();
             };
 
-            // We must wait for the image to be loaded to get its dimensions before we can calculate the scaling
             if (printImage.complete) {
                 drawMarksAndPrint();
             } else {
@@ -1782,7 +1795,6 @@ if (toDate) {
         }
 
 		function downloadReport() {
-            // Determine which report table is currently visible
             const isAdminScreenActive = document.getElementById('admin-screens').classList.contains('active-screen');
             const table = isAdminScreenActive 
                 ? document.querySelector('#admin-reports-screen .report-table') 
@@ -1794,35 +1806,37 @@ if (toDate) {
             }
 
             const rows = table.querySelectorAll('tr');
-            if (rows.length <= 1) { // Only header row exists
+            if (rows.length <= 1) { 
                 showError('No data available to download.');
                 return;
             }
 
             let csv = [];
             
-            // Helper function to format each cell for CSV
             const formatCell = (cellText) => {
-                let text = cellText.replace(/"/g, '""'); // Escape double quotes
+                let text = cellText.replace(/"/g, '""');
                 if (text.search(/("|,|\n)/g) >= 0) {
-                    text = `"${text}"`; // Enclose in double quotes if it contains quotes, commas, or newlines
+                    text = `"${text}"`;
                 }
                 return text;
             };
 
-            // Process header row
             const headers = [];
             rows[0].querySelectorAll('th').forEach(th => {
-                headers.push(formatCell(th.textContent.trim()));
+                if (th.textContent.trim() !== "Download") {
+                    headers.push(formatCell(th.textContent.trim()));
+                }
             });
             csv.push(headers.join(','));
 
-            // Process data rows
             for (let i = 1; i < rows.length; i++) {
                 const row = [], cols = rows[i].querySelectorAll('td');
                 for (let j = 0; j < cols.length; j++) {
-                    // Skip the last column if it's the "Marks" button
-                    if (j === cols.length - 1 && cols[j].querySelector('button')) {
+                    if (j === 0) { // The first column with the button
+                        row.push(formatCell(cols[j].querySelector('span:last-child').textContent.trim()));
+                        continue;
+                    }
+                    if (cols[j].querySelector('button')) {
                          row.push('See in App');
                     } else {
                          row.push(formatCell(cols[j].textContent.trim()));
@@ -1831,7 +1845,6 @@ if (toDate) {
                 csv.push(row.join(','));
             }
 
-            // Create CSV file and trigger download
             const csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
             const downloadLink = document.createElement('a');
             
@@ -1848,3 +1861,4 @@ if (toDate) {
     </script>
 </body>
 </html>
+
