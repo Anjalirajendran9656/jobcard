@@ -508,17 +508,27 @@
             </div>
         </div>
         
-        <div class="border-t pt-4">
-            <label class="form-label">Add New Suggested Repair (from Mechanic)</label>
-            <div class="flex flex-col sm:flex-row items-start gap-2">
-                <input id="suggestion-input" type="text" class="form-input flex-grow" placeholder="e.g., Change engine oil">
-                <input id="suggestion-amount-input" type="number" class="form-input w-full sm:w-32" placeholder="Amount (₹)">
-                <button type="button" onclick="addSuggestion()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 shrink-0 self-center">
-                    <span class="material-symbols-outlined">add</span>
-                </button>
-            </div>
-            <div id="executive-suggestions-list" class="mt-3 space-y-2"></div>
+        <!-- The new, cleaner layout for adding mechanic suggestions -->
+<!-- This new layout ensures the repair input is always wide enough -->
+<div class="border-t pt-4">
+    <label class="form-label">Add New Suggested Repair (from Mechanic)</label>
+    <!-- This container will now stack its children vertically on small screens -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-gray-100 rounded-lg">
+        
+        <!-- The complaint input will take full width on all screen sizes -->
+        <input id="suggestion-input" type="text" class="form-input !py-1 !px-2 flex-grow" placeholder="e.g., Change engine oil">
+        
+        <!-- This group contains the amount and button, and will appear below the input on small screens -->
+        <div class="flex items-center justify-end gap-2 shrink-0">
+            <label for="suggestion-amount-input" class="font-bold text-gray-500">₹</label>
+            <input id="suggestion-amount-input" type="number" class="form-input !py-1 !px-2 w-24 text-right" placeholder="Cost">
+            <button type="button" onclick="addSuggestion()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200">
+                <span class="material-symbols-outlined">add</span>
+            </button>
         </div>
+    </div>
+    <div id="executive-suggestions-list" class="mt-3 space-y-2"></div>
+</div>
 
         <div>
             <h3 class="text-base font-bold mb-2 border-t pt-4">Customer Approval for Mechanic Suggestions</h3>
@@ -533,16 +543,7 @@
             <p class="text-xs text-gray-500">This is an estimated total based on all customer complaints and suggested repairs.</p>
         </div>
 
-        <div>
-            <label class="form-label border-t pt-4">Materials Required for Service</label>
-            <div class="flex items-center gap-2">
-                <input id="material-input" type="text" class="form-input flex-grow" placeholder="e.g., 1L Engine Oil, 4 Spark Plugs">
-                <button type="button" onclick="addMaterial()" class="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 shrink-0">
-                    <span class="material-symbols-outlined">add</span>
-                </button>
-            </div>
-            <div id="materials-required-list" class="mt-3 space-y-2"></div>
-        </div>
+        
 
         <div>
             <label for="delivery-date" class="form-label border-t pt-4">Expected Delivery Date <span class="text-red-500">*</span></label>
@@ -1055,7 +1056,7 @@
         let currentReportId = null;
         let originalComplaintsForUpdate = [];
 		let newSuggestions = [];
-        let requiredMaterials = [];
+        
         let currentComplaints = []; 
         let currentOdometer = 0; 
         let originalClientName = '';
@@ -2176,6 +2177,7 @@ function recalculateAndUpdateTotal() {
 // REPLACE the existing renderSuggestions function
 // REPLACE the existing renderSuggestions function with this one.
 // This function now populates three different lists for better clarity.
+// This function now generates a smaller amount field for the complaints list.
 function renderSuggestions(complaints = [], suggestions = [], approved = []) {
     const executiveList = document.getElementById('executive-suggestions-list');
     const customerComplaintsList = document.getElementById('customer-complaints-list');
@@ -2194,7 +2196,8 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
                 </div>
                 <div class="flex items-center gap-1">
                     <span class="font-bold text-gray-500">₹</span>
-                    <input type="number" class="form-input !py-1 !px-2 w-28 text-right" 
+                    <!-- WIDTH CHANGE: from w-28 to w-20 -->
+                    <input type="number" class="form-input !py-1 !px-2 w-20 text-right" 
                            value="${item.amount || 0}" placeholder="Cost"
                            data-text="${sanitizedText}" oninput="updateComplaintCost(this.dataset.text, this.value)">
                 </div>
@@ -2205,7 +2208,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         customerComplaintsList.innerHTML = '<p class="text-sm text-gray-500">No original complaints were registered.</p>';
     }
     
-    // 2. Render newly added mechanic suggestions (with delete buttons)
+    // The rest of the function remains unchanged...
     executiveList.innerHTML = '';
     if (suggestions.length > 0) {
         suggestions.forEach((item, index) => {
@@ -2221,7 +2224,6 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         });
     }
 
-    // 3. Render mechanic suggestions again, but with checkboxes for approval tracking
     customerApprovalList.innerHTML = '';
     if (suggestions.length > 0) {
         suggestions.forEach(item => {
@@ -2246,124 +2248,97 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
 }
 
 
-        function addMaterial() {
-            const input = document.getElementById('material-input');
-            const materialText = input.value.trim();
-            if (materialText) {
-                requiredMaterials.push(materialText);
-                input.value = '';
-                renderMaterials();
+
+       async function saveVehicleUpdate(shouldReset = true) {
+            if(!currentReportId) return showError('No report selected for update.');
+
+            const deliveryDate = document.getElementById('delivery-date').value;
+            if(!deliveryDate) return showError('Please select an expected delivery date.');
+
+            const approvedItems = [];
+            document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
+                try {
+                    approvedItems.push(JSON.parse(checkbox.value));
+                } catch(e) { console.error("Could not parse approved item from checkbox", checkbox.value); }
+            });
+
+            const allSuggestions = [...new Set(newSuggestions)];
+
+            // The 'materials_required' line has been removed from this object
+            const updateData = {
+                complaint: JSON.stringify(originalComplaintsForUpdate), // KEY CHANGE: Save updated complaints
+                suggested: JSON.stringify(allSuggestions),
+                approved: JSON.stringify(approvedItems),
+                expected_delivery: deliveryDate,
+                status: 'Ongoing'
+            };
+
+            const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
+            if(error) return showError(`Failed to save update: ${error.message}`);
+
+            showSuccessMessage('Update saved successfully!');
+            if (shouldReset) {
+                resetVehicleUpdateScreen();
             }
         }
-        function deleteMaterial(index) {
-            requiredMaterials.splice(index, 1);
-            renderMaterials();
-        }
-
-        function renderMaterials() {
-            const list = document.getElementById('materials-required-list');
-            list.innerHTML = '';
-            if (requiredMaterials.length > 0) {
-                requiredMaterials.forEach((text, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'flex items-center justify-between bg-gray-50 p-2 rounded-lg text-sm';
-                    item.innerHTML = `
-                        <p class="flex-1 mr-2">${text}</p>
-                        <button type="button" onclick="deleteMaterial(${index})" class="text-red-500 hover:text-red-700 shrink-0">
-                            <span class="material-symbols-outlined">delete</span>
-                        </button>
-                    `;
-                    list.appendChild(item);
-                });
-            }
-        }
-
-        async function saveVehicleUpdate(shouldReset = true) {
-    if(!currentReportId) return showError('No report selected for update.');
-
-    const deliveryDate = document.getElementById('delivery-date').value;
-    if(!deliveryDate) return showError('Please select an expected delivery date.');
-
-    const approvedItems = [];
-    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
-        try {
-            approvedItems.push(JSON.parse(checkbox.value));
-        } catch(e) { console.error("Could not parse approved item from checkbox", checkbox.value); }
-    });
-
-    const allSuggestions = [...new Set(newSuggestions)];
-
-    const updateData = {
-        complaint: JSON.stringify(originalComplaintsForUpdate), // KEY CHANGE: Save updated complaints
-        suggested: JSON.stringify(allSuggestions),
-        approved: JSON.stringify(approvedItems),
-        materials_required: JSON.stringify(requiredMaterials),
-        expected_delivery: deliveryDate,
-        status: 'Ongoing'
-    };
-
-    const { error } = await sb.from('reports').update(updateData).eq('id', currentReportId);
-    if(error) return showError(`Failed to save update: ${error.message}`);
-
-    showSuccessMessage('Update saved successfully!');
-    if (shouldReset) {
-        resetVehicleUpdateScreen();
-    }
-}
 
                 
-        async function sendApprovalLink() {
-            if (!currentReportId) { 
-                showError('No report is currently selected.'); 
-                return; 
-            }
-            
-            const savedSuccessfully = await saveSuggestionsForApproval();
-            if (!savedSuccessfully) {
-                showError('Could not save suggestions before sending. Please try again.');
-                return;
-            }
+        // This new version combines all items and costs before creating the link.
+async function sendApprovalLink() {
+    if (!currentReportId) { 
+        showError('No report is currently selected.'); 
+        return; 
+    }
+    
+    // CRITICAL FIX: Combine original complaints (with updated amounts) and new suggestions into one list.
+    const allItemsForApproval = [
+        ...originalComplaintsForUpdate,
+        ...newSuggestions
+    ];
 
-            const { error: statusUpdateError } = await sb.from('reports')
-                .update({ status: 'Ongoing' })
-                .eq('id', currentReportId);
+    // Now, save this complete list to the 'suggested' column. This becomes the single source of truth for the customer.
+    const { error: saveDataError } = await sb.from('reports')
+        .update({ 
+            suggested: JSON.stringify(allItemsForApproval), // Save the combined list
+            status: 'Ongoing' 
+        })
+        .eq('id', currentReportId);
 
-            if (statusUpdateError) {
-                showError('Could not update job status before sending. Please try again.');
-                console.error('Status Update Error:', statusUpdateError);
-                return;
-            }
+    if (saveDataError) {
+        showError('Could not save data for approval. Please try again.');
+        console.error('Save for Approval Error:', saveDataError);
+        return;
+    }
+    
+    const { data: reportData, error: reportError } = await sb
+        .from('reports')
+        .select('client_phone, vehicles(client_phone)')
+        .eq('id', currentReportId)
+        .single();
 
-            const { data: reportData, error: reportError } = await sb
-                .from('reports')
-                .select('client_phone, vehicles(client_phone)')
-                .eq('id', currentReportId)
-                .single();
+    if (reportError) { 
+        showError("Could not fetch report details to send the link."); 
+        return; 
+    }
+    
+    const clientPhone = reportData.client_phone || reportData.vehicles?.client_phone;
 
-            if (reportError) { 
-                console.error("Error fetching report details:", reportError); 
-                showError("Could not fetch report details to send the link."); 
-                return; 
-            }
-            
-            const clientPhone = reportData.client_phone || reportData.vehicles?.client_phone;
+    if (!clientPhone) { 
+        showError("A client phone number could not be found for this report or vehicle."); 
+        return; 
+    }
+    
+    const approvalUrl = `${window.location.origin}${window.location.pathname}?report_id=${currentReportId}`;
+    const messageText = `Dear Customer,\n\nPlease review and approve the suggested repairs for your vehicle using the link below:\n${approvalUrl}\n\nThank you,\nAutoFix Service`;
+    
+    const encodedText = encodeURIComponent(messageText);
+    const whatsappUrl = `https://wa.me/91${clientPhone}?text=${encodedText}`;
+    
+    window.open(whatsappUrl, '_blank');
 
-            if (!clientPhone) { 
-                showError("A client phone number could not be found for this report or vehicle."); 
-                return; 
-            }
-            
-            const approvalUrl = `${window.location.origin}${window.location.pathname}?report_id=${currentReportId}`;
-            const messageText = `Dear Customer,\n\nPlease review and approve the suggested repairs for your vehicle using the link below:\n${approvalUrl}\n\nThank you,\nAutoFix Service`;
-            
-            const encodedText = encodeURIComponent(messageText);
-            const whatsappUrl = `https://wa.me/91${clientPhone}?text=${encodedText}`;
-            
-            window.open(whatsappUrl, '_blank');
-
-            showSuccessMessage("Approval link sent and job moved to 'Awaiting Response'.");
-            resetVehicleUpdateScreen();
-        }
+    showSuccessMessage("Approval link sent and job moved to 'Awaiting Response'.");
+    resetVehicleUpdateScreen();
+}
 
         async function populateNotStartedJobs() {
             if (!currentUser) {
@@ -2415,6 +2390,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
 
                 card.className = 'p-4 border border-gray-200 rounded-lg hover:shadow-md hover:border-blue-500 transition-all flex justify-between items-center';
 
+                // THE FIX IS IN THE <p> TAG FOR THE COMPLAINT BELOW
                 card.innerHTML = `
                     <div class="flex-grow cursor-pointer" onclick="selectReportForUpdateById(${report.id})">
                         <div class="flex items-center gap-4">
@@ -2422,7 +2398,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
                             <p class="text-xs font-medium text-gray-500">${createdDate}</p>
                         </div>
                         <p class="text-sm text-gray-600 mt-1">${description}</p>
-                        <p class="text-xs text-gray-500 mt-1 truncate" title="${formatArrayCell(report.complaint)}"><strong>Complaint:</strong> ${formatArrayCell(report.complaint)}</p>
+                        <p class="text-xs text-gray-500 mt-1 break-all"><strong>Complaint:</strong> ${formatArrayCell(report.complaint)}</p>
                     </div>
                     <div class="menu-container">
                         <button class="menu-button p-2 rounded-full hover:bg-gray-100">
@@ -2826,7 +2802,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
                 }
                 return 'N/A';
             } catch (e) {
-                return jsonString; 
+                return jsonString;
             }
         };
 
@@ -2856,88 +2832,87 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         }
 
        function selectReportForUpdate(report) {
-    document.getElementById('update-tab-container').classList.add('hidden');
-    
-    currentReportId = report.id;
-    
-    document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
-    updateDetailsSection.classList.remove('hidden');
-    updateFormSection.classList.remove('hidden');
+            document.getElementById('update-tab-container').classList.add('hidden');
+            
+            currentReportId = report.id;
+            
+            document.getElementById('update-detail-number').textContent = report.vehicles.vehicle_no;
+            updateDetailsSection.classList.remove('hidden');
+            updateFormSection.classList.remove('hidden');
 
-    try {
-        let parsedComplaints = JSON.parse(report.complaint || '[]');
-        originalComplaintsForUpdate = parsedComplaints.map(c => 
-            typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c
-        );
-    } catch (e) {
-        originalComplaintsForUpdate = [];
-    }
-    try {
-        let parsedSuggestions = report.suggested ? JSON.parse(report.suggested) : [];
-        newSuggestions = parsedSuggestions.map(s => 
-            typeof s === 'string' ? { text: s, amount: 0, type: 'suggestion' } : s
-        );
-    } catch (e) {
-        newSuggestions = [];
-    }
-    requiredMaterials = report.materials_required ? JSON.parse(report.materials_required) : [];
+            try {
+                let parsedComplaints = JSON.parse(report.complaint || '[]');
+                originalComplaintsForUpdate = parsedComplaints.map(c => 
+                    typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c
+                );
+            } catch (e) {
+                originalComplaintsForUpdate = [];
+            }
+            try {
+                let parsedSuggestions = report.suggested ? JSON.parse(report.suggested) : [];
+                newSuggestions = parsedSuggestions.map(s => 
+                    typeof s === 'string' ? { text: s, amount: 0, type: 'suggestion' } : s
+                );
+            } catch (e) {
+                newSuggestions = [];
+            }
 
-    const approvedItems = report.approved ? JSON.parse(report.approved) : [];
-    
-    renderSuggestions(originalComplaintsForUpdate, newSuggestions, approvedItems);
-    renderMaterials();
+            const approvedItems = report.approved ? JSON.parse(report.approved) : [];
+            
+            // The call to renderMaterials() has been removed here
+            renderSuggestions(originalComplaintsForUpdate, newSuggestions, approvedItems);
 
-    const complaintDisplayList = document.getElementById('original-complaints-list');
-    const complaintSummaryP = document.getElementById('update-detail-complaint');
-    const complaintDisplayDiv = document.getElementById('original-complaints-display');
-    complaintDisplayList.innerHTML = '';
+            const complaintDisplayList = document.getElementById('original-complaints-list');
+            const complaintSummaryP = document.getElementById('update-detail-complaint');
+            const complaintDisplayDiv = document.getElementById('original-complaints-display');
+            complaintDisplayList.innerHTML = '';
 
-    if (originalComplaintsForUpdate.length > 0) {
-        complaintSummaryP.textContent = `${originalComplaintsForUpdate.length} issue(s) registered.`;
-        originalComplaintsForUpdate.forEach(complaint => {
-            const li = document.createElement('li');
-            li.textContent = complaint.text;
-            complaintDisplayList.appendChild(li);
-        });
-        complaintDisplayDiv.classList.remove('hidden');
-    } else {
-        complaintSummaryP.textContent = 'No complaints registered.';
-        complaintDisplayDiv.classList.add('hidden');
-    }
+            if (originalComplaintsForUpdate.length > 0) {
+                complaintSummaryP.textContent = `${originalComplaintsForUpdate.length} issue(s) registered.`;
+                originalComplaintsForUpdate.forEach(complaint => {
+                    const li = document.createElement('li');
+                    li.textContent = complaint.text;
+                    complaintDisplayList.appendChild(li);
+                });
+                complaintDisplayDiv.classList.remove('hidden');
+            } else {
+                complaintSummaryP.textContent = 'No complaints registered.';
+                complaintDisplayDiv.classList.add('hidden');
+            }
 
-    const feedbackDisplay = document.getElementById('customer-feedback-display');
-    const feedbackTextDisplay = document.getElementById('customer-feedback-text-display');
-    const feedbackAudioDisplay = document.getElementById('customer-feedback-audio-display');
+            const feedbackDisplay = document.getElementById('customer-feedback-display');
+            const feedbackTextDisplay = document.getElementById('customer-feedback-text-display');
+            const feedbackAudioDisplay = document.getElementById('customer-feedback-audio-display');
 
-    feedbackDisplay.classList.add('hidden');
-    feedbackTextDisplay.classList.add('hidden');
-    feedbackAudioDisplay.classList.add('hidden');
-    feedbackTextDisplay.textContent = '';
-    feedbackAudioDisplay.innerHTML = '';
+            feedbackDisplay.classList.add('hidden');
+            feedbackTextDisplay.classList.add('hidden');
+            feedbackAudioDisplay.classList.add('hidden');
+            feedbackTextDisplay.textContent = '';
+            feedbackAudioDisplay.innerHTML = '';
 
-    if (report.customer_feedback_text || report.customer_feedback_audio) {
-        feedbackDisplay.classList.remove('hidden');
-        if (report.customer_feedback_text) {
-            feedbackTextDisplay.textContent = report.customer_feedback_text;
-            feedbackTextDisplay.classList.remove('hidden');
+            if (report.customer_feedback_text || report.customer_feedback_audio) {
+                feedbackDisplay.classList.remove('hidden');
+                if (report.customer_feedback_text) {
+                    feedbackTextDisplay.textContent = report.customer_feedback_text;
+                    feedbackTextDisplay.classList.remove('hidden');
+                }
+                if (report.customer_feedback_audio) {
+                    feedbackAudioDisplay.innerHTML = `<audio controls src="${report.customer_feedback_audio}" class="w-full"></audio>`;
+                    feedbackAudioDisplay.classList.remove('hidden');
+                }
+            }
+
+            document.getElementById('delivery-date').value = report.expected_delivery || '';
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('delivery-date').setAttribute('min', today);
+
+            const whatsappButton = document.getElementById('send-whatsapp-btn');
+            if (report.approved && report.approved !== '[]') {
+                whatsappButton.style.display = 'none';
+            } else {
+                whatsappButton.style.display = 'flex';
+            }
         }
-        if (report.customer_feedback_audio) {
-            feedbackAudioDisplay.innerHTML = `<audio controls src="${report.customer_feedback_audio}" class="w-full"></audio>`;
-            feedbackAudioDisplay.classList.remove('hidden');
-        }
-    }
-
-    document.getElementById('delivery-date').value = report.expected_delivery || '';
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('delivery-date').setAttribute('min', today);
-
-    const whatsappButton = document.getElementById('send-whatsapp-btn');
-    if (report.approved && report.approved !== '[]') {
-        whatsappButton.style.display = 'none';
-    } else {
-        whatsappButton.style.display = 'flex';
-    }
-}
 
         function selectReportForUpdateById(reportId) {
             const report = updateableReportsStore[reportId];
@@ -2955,13 +2930,10 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
             document.getElementById('update-tab-container').classList.remove('hidden');
             document.getElementById('delivery-date').value = '';
             newSuggestions = [];
-            requiredMaterials = [];
             currentReportId = null;
             renderSuggestions();
-            renderMaterials();
             showUpdateTab('pending');
         }
-
         // --- Damage Marking Functions ---
         function resizeCanvas() {
             if (!carImage || !damageCanvas || !checkCanvas) return;
@@ -3174,75 +3146,78 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         }
 
         // --- Customer Approval Flow ---
-       async function loadApprovalScreen(reportId) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('admin-screens').style.display = 'none';
-    document.getElementById('executive-screens').style.display = 'none';
-    document.getElementById('customer-approval-screen').classList.add('active-screen');
+       // This new version correctly displays all items and costs for the customer.
+// This new version correctly displays all items and costs for the customer.
+        async function loadApprovalScreen(reportId) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-screens').style.display = 'none';
+            document.getElementById('executive-screens').style.display = 'none';
+            document.getElementById('customer-approval-screen').classList.add('active-screen');
 
-    const { data: report, error } = await sb.from('reports')
-        .select(`complaint, suggested, approved, vehicles ( vehicle_no )`)
-        .eq('id', reportId)
-        .single();
+            // We now only need the 'suggested' column, as it contains the complete list.
+            const { data: report, error } = await sb.from('reports')
+                .select(`suggested, approved, vehicles ( vehicle_no )`)
+                .eq('id', reportId)
+                .single();
 
-    if (error || !report) {
-        console.error('Error fetching report for approval:', error);
-        showError('Could not load the approval details. The link may be invalid.');
-        document.getElementById('approval-content').innerHTML = '<p class="text-center text-red-600">Could not load report details.</p>';
-        return;
-    }
-
-    document.getElementById('approval-vehicle-no').textContent = report.vehicles.vehicle_no;
-
-    if (report.approved && report.approved !== '[]') {
-        document.getElementById('approval-content').classList.add('hidden');
-        const successMsg = document.getElementById('approval-success-message');
-        successMsg.querySelector('h3').textContent = 'Response Already Submitted';
-        successMsg.querySelector('p').textContent = 'Thank you, we have already received your feedback for this service request.';
-        successMsg.classList.remove('hidden');
-        document.querySelector('#customer-approval-card h2').textContent = 'Response Received';
-    } else {
-        const suggestionsList = document.getElementById('approval-suggestions-list');
-        suggestionsList.innerHTML = '';
-        try {
-            let parsedComplaints = JSON.parse(report.complaint || '[]');
-            let parsedSuggestions = JSON.parse(report.suggested || '[]');
-
-            const allComplaints = parsedComplaints.map(c => typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c);
-            const allSuggestions = parsedSuggestions.map(s => typeof s === 'string' ? { text: s, amount: 0, type: 'suggestion' } : s);
-            
-            const allItems = [...allComplaints, ...allSuggestions];
-
-            if (allItems.length > 0) {
-                 allItems.forEach(item => {
-                    const isOriginalComplaint = item.type === 'complaint';
-                    const label = document.createElement('label');
-                    const bgColor = isOriginalComplaint ? 'bg-gray-100' : 'bg-blue-50';
-                    const tag = isOriginalComplaint ? `<span class="text-xs text-gray-500">(Your Request)</span>` : `<span class="text-xs text-blue-600">(Mechanic Suggestion)</span>`;
-                    const amountDisplay = `<span class="font-bold text-gray-800">₹${(item.amount || 0).toFixed(2)}</span>`;
-                    const checkboxValue = `'${JSON.stringify(item)}'`;
-
-                    label.className = `flex items-center gap-3 p-3 ${bgColor} rounded-lg cursor-pointer hover:bg-gray-200 transition-colors`;
-                    label.innerHTML = `
-                        <input type="checkbox" value=${checkboxValue} class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" ${isOriginalComplaint ? 'checked' : ''} onchange="updateCustomerTotal()">
-                        <div class="flex-1 flex justify-between items-center">
-                             <span class="text-sm font-medium">${item.text}</span>
-                             ${amountDisplay}
-                        </div>
-                        ${tag}
-                    `;
-                    suggestionsList.appendChild(label);
-                });
-            } else {
-                suggestionsList.innerHTML = '<p class="text-sm text-gray-500">No specific repairs were suggested.</p>';
+            if (error || !report) {
+                console.error('Error fetching report for approval:', error);
+                document.getElementById('approval-content').innerHTML = '<p class="text-center text-red-600">Could not load report details. The link may be invalid.</p>';
+                return;
             }
-        } catch (e) {
-            console.error("Error parsing suggestions/complaints:", e);
-            suggestionsList.innerHTML = '<p class="text-sm text-red-500">Could not display suggested repairs.</p>';
+
+            document.getElementById('approval-vehicle-no').textContent = report.vehicles.vehicle_no;
+
+            if (report.approved && report.approved !== '[]') {
+                document.getElementById('approval-content').classList.add('hidden');
+                const successMsg = document.getElementById('approval-success-message');
+                successMsg.querySelector('h3').textContent = 'Response Already Submitted';
+                successMsg.querySelector('p').textContent = 'Thank you, we have already received your feedback for this service request.';
+                successMsg.classList.remove('hidden');
+                document.querySelector('#customer-approval-card h2').textContent = 'Response Received';
+            } else {
+                const suggestionsList = document.getElementById('approval-suggestions-list');
+                suggestionsList.innerHTML = '';
+                try {
+                    // This now gets the complete, correct list from the 'suggested' column
+                    const allItems = JSON.parse(report.suggested || '[]');
+
+                    if (allItems.length > 0) {
+                         allItems.forEach(item => {
+                            const isOriginalComplaint = item.type === 'complaint';
+                            const label = document.createElement('label');
+                            const bgColor = isOriginalComplaint ? 'bg-gray-100' : 'bg-blue-50';
+                            const tag = isOriginalComplaint 
+                                ? `<span class="text-xs text-gray-500">(Your Request)</span>` 
+                                : `<span class="text-xs text-blue-600">(Mechanic Suggestion)</span>`;
+                            
+                            // CRITICAL FIX: Display amount as text, not an input field.
+                            const amountDisplay = `<span class="font-bold text-gray-800 shrink-0">₹${(item.amount || 0).toFixed(2)}</span>`;
+                            const checkboxValue = `'${JSON.stringify(item)}'`;
+
+                            label.className = `flex items-center gap-3 p-3 ${bgColor} rounded-lg cursor-pointer hover:bg-gray-200 transition-colors`;
+                            
+                            // THE FIX IS ON THE NEXT LINE: Added 'break-all' class to the span
+                            label.innerHTML = `
+                                <input type="checkbox" value=${checkboxValue} class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" onchange="updateCustomerTotal()">
+                                <div class="flex-1 flex justify-between items-center gap-3">
+                                     <span class="text-sm font-medium break-all">${item.text}</span>
+                                     ${amountDisplay}
+                                </div>
+                                ${tag}
+                            `;
+                            suggestionsList.appendChild(label);
+                        });
+                    } else {
+                        suggestionsList.innerHTML = '<p class="text-sm text-gray-500">No specific repairs were suggested.</p>';
+                    }
+                } catch (e) {
+                    console.error("Error parsing items for approval:", e);
+                    suggestionsList.innerHTML = '<p class="text-sm text-red-500">Could not display suggested repairs.</p>';
+                }
+                updateCustomerTotal();
+            }
         }
-        updateCustomerTotal();
-    }
-}
 
 
         async function submitCustomerFeedback() {
@@ -3371,18 +3346,24 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
                 const list = document.getElementById(listId);
                 list.innerHTML = '';
                 try {
-                    const items = JSON.parse(dataString);
+                    const items = JSON.parse(dataString || '[]'); // Safely parse the data
                     if (items && items.length > 0) {
                         items.forEach(item => {
                             const li = document.createElement('li');
-                            li.textContent = item;
+                            // **THE FIX: Check if the item is an object and use its .text property**
+                            if (typeof item === 'object' && item !== null && item.text) {
+                                li.textContent = item.text;
+                            } else {
+                                // Fallback for older data that might just be strings
+                                li.textContent = item;
+                            }
                             list.appendChild(li);
                         });
                     } else {
                         list.innerHTML = '<li>N/A</li>';
                     }
-                } catch(e) {
-                    list.innerHTML = '<li>N/A</li>';
+                } catch (e) {
+                    list.innerHTML = '<li>Error loading data</li>';
                 }
             };
             populateList('print-complaints-list', reportData.complaint);
