@@ -2201,7 +2201,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
             complaintItem.className = 'flex items-center justify-between gap-3 p-3 bg-gray-100 rounded-lg';
             complaintItem.innerHTML = `
                 <div class="flex-1">
-                    <span class="font-medium">${item.text}</span>
+                    <span class="font-medium break-all">${item.text}</span>
                 </div>
                 <div class="flex items-center gap-1">
                     <span class="font-bold text-gray-500">₹</span>
@@ -2254,7 +2254,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
             approvalItem.innerHTML = `
                 <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value=${checkboxValue} ${isApproved ? 'checked' : ''}>
                 <div class="flex-1 flex justify-between items-center">
-                    <span class="font-medium">${item.text}</span>
+                   <span class="font-medium break-all">${item.text}</span>
                     <span class="font-bold text-gray-800">₹${(item.amount || 0).toFixed(2)}</span>
                 </div>
                 ${tag}
@@ -2308,29 +2308,22 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         // This new version combines all items and costs before creating the link.
 // This new version opens a window immediately to prevent pop-up blockers
 // and fetches the client's phone number more reliably.
+// This is a more robust version that ensures all data is saved and verified
+// BEFORE attempting to open the WhatsApp link in a single, direct action.
 async function sendApprovalLink() {
     if (!currentReportId) {
-        showError('No report is currently selected.');
-        return;
-    }
-
-    // 1. Open a blank window immediately to avoid being blocked by pop-up blockers.
-    const whatsappWindow = window.open('', '_blank');
-    if (whatsappWindow) {
-        whatsappWindow.document.write('Please wait, preparing your WhatsApp message...');
-    } else {
-        showError('Pop-up was blocked! Please allow pop-ups for this site.');
-        return;
+        return showError('No report is currently selected.');
     }
 
     try {
-        // 2. Combine original complaints and new suggestions into one list for the customer.
+        // 1. Give the user immediate feedback that something is happening.
+        showSuccessMessage('Saving and preparing link...');
+
+        // 2. Combine and save all required data to the database first.
         const allItemsForApproval = [
             ...originalComplaintsForUpdate,
             ...newSuggestions
         ];
-
-        // 3. Save this complete list to the 'suggested' column in the database.
         const { error: saveDataError } = await sb.from('reports')
             .update({
                 suggested: JSON.stringify(allItemsForApproval),
@@ -2339,13 +2332,14 @@ async function sendApprovalLink() {
             .eq('id', currentReportId);
 
         if (saveDataError) {
-            throw saveDataError; // This will be caught by the catch block
+            // If saving fails, stop here and show an error.
+            throw saveDataError;
         }
 
-        // 4. More robustly fetch the report and related vehicle data to find the phone number.
+        // 3. Fetch the report data again to get the client's phone number.
         const { data: reportData, error: reportError } = await sb
             .from('reports')
-            .select('client_phone, vehicles(*)') // Fetch phone from report AND all vehicle details as a fallback
+            .select('client_phone, vehicles(*)')
             .eq('id', currentReportId)
             .single();
 
@@ -2353,38 +2347,31 @@ async function sendApprovalLink() {
             throw reportError;
         }
 
-        // 5. Prioritize the phone number from the report, then fall back to the vehicle's main number.
+        // 4. Explicitly check if a phone number exists.
         const clientPhone = reportData.client_phone || reportData.vehicles?.client_phone;
-
         if (!clientPhone) {
-            showError("A client phone number could not be found for this report or vehicle.");
-            if (whatsappWindow) whatsappWindow.close(); // Close the pop-up on error
-            return;
+            // This is a clear error message instead of getting stuck.
+            return showError("Cannot send: Client phone number is missing for this job card.");
         }
 
-        // 6. Construct the final WhatsApp URL.
+        // 5. Construct the final URL.
         const approvalUrl = `${window.location.origin}${window.location.pathname}?report_id=${currentReportId}`;
         const messageText = `Dear Customer,\n\nPlease review and approve the suggested repairs for your vehicle using the link below:\n${approvalUrl}\n\nThank you,\nAutoFix Service`;
         const encodedText = encodeURIComponent(messageText);
         const whatsappUrl = `https://wa.me/91${clientPhone}?text=${encodedText}`;
 
-        // 7. On success, redirect the new window to the generated URL.
-        if (whatsappWindow) {
-            whatsappWindow.location.href = whatsappUrl;
-        }
+        // 6. Only after all checks pass, open the link directly.
+        window.open(whatsappUrl, '_blank');
 
-        showSuccessMessage("Approval link sent and job moved to 'Awaiting Response'.");
+        showSuccessMessage("Approval link sent! Job moved to 'Awaiting Response'.");
         resetVehicleUpdateScreen();
 
     } catch (error) {
+        // This will catch any error from the steps above.
         console.error('Error in sendApprovalLink:', error);
         showError(`An error occurred: ${error.message}`);
-        if (whatsappWindow) {
-            whatsappWindow.close(); // Close the pop-up if anything fails
-        }
     }
 }
-
         async function populateNotStartedJobs() {
             if (!currentUser) {
                 console.error("populateNotStartedJobs: currentUser is null. Cannot fetch data.");
@@ -2903,22 +2890,29 @@ async function sendApprovalLink() {
             updateDetailsSection.classList.remove('hidden');
             updateFormSection.classList.remove('hidden');
 
-            try {
+            // ADD THIS NEW LOGIC IN ITS PLACE
+        try {
+            const suggestedItems = report.suggested ? JSON.parse(report.suggested) : null;
+
+            if (suggestedItems && suggestedItems.length > 0) {
+                // If 'suggested' has data, it's the master list.
+                // Split it back into the two separate lists for the UI.
+                originalComplaintsForUpdate = suggestedItems.filter(item => item.type === 'complaint');
+                newSuggestions = suggestedItems.filter(item => item.type === 'suggestion');
+            } else {
+                // If 'suggested' is empty, it's a pre-approval job.
+                // Use the original 'complaint' column and start with no new suggestions.
                 let parsedComplaints = JSON.parse(report.complaint || '[]');
                 originalComplaintsForUpdate = parsedComplaints.map(c => 
                     typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c
                 );
-            } catch (e) {
-                originalComplaintsForUpdate = [];
-            }
-            try {
-                let parsedSuggestions = report.suggested ? JSON.parse(report.suggested) : [];
-                newSuggestions = parsedSuggestions.map(s => 
-                    typeof s === 'string' ? { text: s, amount: 0, type: 'suggestion' } : s
-                );
-            } catch (e) {
                 newSuggestions = [];
             }
+        } catch (e) {
+            console.error("Error parsing complaint/suggestion data:", e);
+            originalComplaintsForUpdate = [];
+            newSuggestions = [];
+        }
 
             const approvedItems = report.approved ? JSON.parse(report.approved) : [];
             
@@ -2935,6 +2929,7 @@ async function sendApprovalLink() {
                 originalComplaintsForUpdate.forEach(complaint => {
                     const li = document.createElement('li');
                     li.textContent = complaint.text;
+					li.classList.add('break-all');
                     complaintDisplayList.appendChild(li);
                 });
                 complaintDisplayDiv.classList.remove('hidden');
