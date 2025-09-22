@@ -2816,7 +2816,15 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
             if (!jsonString || jsonString === '[]') return 'N/A';
             try {
                 const arr = JSON.parse(jsonString);
-                return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'N/A';
+                if (Array.isArray(arr) && arr.length > 0) {
+                    // Check if the items are objects with a 'text' property
+                    if (typeof arr[0] === 'object' && arr[0] !== null && 'text' in arr[0]) {
+                        return arr.map(item => item.text).join(', ');
+                    }
+                    // Fallback for arrays of simple strings
+                    return arr.join(', ');
+                }
+                return 'N/A';
             } catch (e) {
                 return jsonString; 
             }
