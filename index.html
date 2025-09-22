@@ -2892,27 +2892,27 @@ async function sendApprovalLink() {
 
             // ADD THIS NEW LOGIC IN ITS PLACE
         try {
-            const suggestedItems = report.suggested ? JSON.parse(report.suggested) : null;
+    const suggestedItems = report.suggested ? JSON.parse(report.suggested) : null;
 
-            if (suggestedItems && suggestedItems.length > 0) {
-                // If 'suggested' has data, it's the master list.
-                // Split it back into the two separate lists for the UI.
-                originalComplaintsForUpdate = suggestedItems.filter(item => item.type === 'complaint');
-                newSuggestions = suggestedItems.filter(item => item.type === 'suggestion');
-            } else {
-                // If 'suggested' is empty, it's a pre-approval job.
-                // Use the original 'complaint' column and start with no new suggestions.
-                let parsedComplaints = JSON.parse(report.complaint || '[]');
-                originalComplaintsForUpdate = parsedComplaints.map(c => 
-                    typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c
-                );
-                newSuggestions = [];
-            }
-        } catch (e) {
-            console.error("Error parsing complaint/suggestion data:", e);
-            originalComplaintsForUpdate = [];
-            newSuggestions = [];
-        }
+    if (suggestedItems && suggestedItems.length > 0) {
+        // If 'suggested' has data, it's the master list.
+        // Split it back into the two separate lists for the UI.
+        originalComplaintsForUpdate = suggestedItems.filter(item => item.type === 'complaint');
+        newSuggestions = suggestedItems.filter(item => item.type === 'suggestion');
+    } else {
+        // If 'suggested' is empty, it's a pre-approval job.
+        // Use the original 'complaint' column and start with no new suggestions.
+        let parsedComplaints = JSON.parse(report.complaint || '[]');
+        originalComplaintsForUpdate = parsedComplaints.map(c => 
+            typeof c === 'string' ? { text: c, amount: 0, type: 'complaint' } : c
+        );
+        newSuggestions = [];
+    }
+} catch (e) {
+    console.error("Error parsing complaint/suggestion data:", e);
+    originalComplaintsForUpdate = [];
+    newSuggestions = [];
+}
 
             const approvedItems = report.approved ? JSON.parse(report.approved) : [];
             
