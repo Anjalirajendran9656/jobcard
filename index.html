@@ -510,7 +510,7 @@
         
         <!-- The new, cleaner layout for adding mechanic suggestions -->
 <!-- This new layout ensures the repair input is always wide enough -->
-<div id="mechanic-suggestions-update-section" class="border-t pt-4">
+<div  class="border-t pt-4">
     <label class="form-label">Add New Suggested Repair (from Mechanic)</label>
     <!-- This container will now stack its children vertically on small screens -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-gray-100 rounded-lg">
@@ -2205,7 +2205,6 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
                 </div>
                 <div class="flex items-center gap-1">
                     <span class="font-bold text-gray-500">₹</span>
-                    <!-- WIDTH CHANGE: from w-28 to w-20 -->
                     <input type="number" class="form-input !py-1 !px-2 w-20 text-right" 
                            value="${item.amount || 0}" placeholder="Cost"
                            data-text="${sanitizedText}" oninput="updateComplaintCost(this.dataset.text, this.value)">
@@ -2217,7 +2216,7 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         customerComplaintsList.innerHTML = '<p class="text-sm text-gray-500">No original complaints were registered.</p>';
     }
     
-    // The rest of the function remains unchanged...
+    // 2. Render NEW mechanic suggestions
     executiveList.innerHTML = '';
     if (suggestions.length > 0) {
         suggestions.forEach((item, index) => {
@@ -2233,25 +2232,39 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         });
     }
 
+    // --- MODIFICATION STARTS HERE ---
+    // 3. Render the COMBINED list for the final approval checklist
     customerApprovalList.innerHTML = '';
-    if (suggestions.length > 0) {
-        suggestions.forEach(item => {
+    const allItemsForApproval = [...complaints, ...suggestions]; // Combine both lists
+
+    if (allItemsForApproval.length > 0) {
+        allItemsForApproval.forEach(item => {
             const isApproved = approved.some(approvedItem => (approvedItem.text || approvedItem) === item.text);
             const checkboxValue = `'${JSON.stringify(item)}'`;
+            
+            // Add a visual tag to distinguish between item types
+            const isOriginalComplaint = item.type === 'complaint';
+            const bgColor = isOriginalComplaint ? 'bg-gray-100' : 'bg-blue-50';
+            const tag = isOriginalComplaint 
+                ? `<span class="text-xs text-gray-500">(Customer Request)</span>` 
+                : `<span class="text-xs text-blue-600">(New Suggestion)</span>`;
+
             const approvalItem = document.createElement('label');
-            approvalItem.className = 'flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100';
+            approvalItem.className = `flex items-center gap-3 p-3 ${bgColor} rounded-lg cursor-pointer hover:bg-gray-200`;
             approvalItem.innerHTML = `
                 <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value=${checkboxValue} ${isApproved ? 'checked' : ''}>
                 <div class="flex-1 flex justify-between items-center">
                     <span class="font-medium">${item.text}</span>
                     <span class="font-bold text-gray-800">₹${(item.amount || 0).toFixed(2)}</span>
                 </div>
+                ${tag}
             `;
             customerApprovalList.appendChild(approvalItem);
         });
     } else {
-        customerApprovalList.innerHTML = '<p class="text-sm text-gray-500">Add mechanic suggestions to see them here for approval.</p>';
+        customerApprovalList.innerHTML = '<p class="text-sm text-gray-500">No complaints or suggestions available for approval.</p>';
     }
+    // --- MODIFICATION ENDS HERE ---
     
     recalculateAndUpdateTotal();
 }
@@ -2293,60 +2306,83 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
 
                 
         // This new version combines all items and costs before creating the link.
+// This new version opens a window immediately to prevent pop-up blockers
+// and fetches the client's phone number more reliably.
 async function sendApprovalLink() {
-    if (!currentReportId) { 
-        showError('No report is currently selected.'); 
-        return; 
-    }
-    
-    // CRITICAL FIX: Combine original complaints (with updated amounts) and new suggestions into one list.
-    const allItemsForApproval = [
-        ...originalComplaintsForUpdate,
-        ...newSuggestions
-    ];
-
-    // Now, save this complete list to the 'suggested' column. This becomes the single source of truth for the customer.
-    const { error: saveDataError } = await sb.from('reports')
-        .update({ 
-            suggested: JSON.stringify(allItemsForApproval), // Save the combined list
-            status: 'Ongoing' 
-        })
-        .eq('id', currentReportId);
-
-    if (saveDataError) {
-        showError('Could not save data for approval. Please try again.');
-        console.error('Save for Approval Error:', saveDataError);
+    if (!currentReportId) {
+        showError('No report is currently selected.');
         return;
     }
-    
-    const { data: reportData, error: reportError } = await sb
-        .from('reports')
-        .select('client_phone, vehicles(client_phone)')
-        .eq('id', currentReportId)
-        .single();
 
-    if (reportError) { 
-        showError("Could not fetch report details to send the link."); 
-        return; 
+    // 1. Open a blank window immediately to avoid being blocked by pop-up blockers.
+    const whatsappWindow = window.open('', '_blank');
+    if (whatsappWindow) {
+        whatsappWindow.document.write('Please wait, preparing your WhatsApp message...');
+    } else {
+        showError('Pop-up was blocked! Please allow pop-ups for this site.');
+        return;
     }
-    
-    const clientPhone = reportData.client_phone || reportData.vehicles?.client_phone;
 
-    if (!clientPhone) { 
-        showError("A client phone number could not be found for this report or vehicle."); 
-        return; 
+    try {
+        // 2. Combine original complaints and new suggestions into one list for the customer.
+        const allItemsForApproval = [
+            ...originalComplaintsForUpdate,
+            ...newSuggestions
+        ];
+
+        // 3. Save this complete list to the 'suggested' column in the database.
+        const { error: saveDataError } = await sb.from('reports')
+            .update({
+                suggested: JSON.stringify(allItemsForApproval),
+                status: 'Ongoing'
+            })
+            .eq('id', currentReportId);
+
+        if (saveDataError) {
+            throw saveDataError; // This will be caught by the catch block
+        }
+
+        // 4. More robustly fetch the report and related vehicle data to find the phone number.
+        const { data: reportData, error: reportError } = await sb
+            .from('reports')
+            .select('client_phone, vehicles(*)') // Fetch phone from report AND all vehicle details as a fallback
+            .eq('id', currentReportId)
+            .single();
+
+        if (reportError) {
+            throw reportError;
+        }
+
+        // 5. Prioritize the phone number from the report, then fall back to the vehicle's main number.
+        const clientPhone = reportData.client_phone || reportData.vehicles?.client_phone;
+
+        if (!clientPhone) {
+            showError("A client phone number could not be found for this report or vehicle.");
+            if (whatsappWindow) whatsappWindow.close(); // Close the pop-up on error
+            return;
+        }
+
+        // 6. Construct the final WhatsApp URL.
+        const approvalUrl = `${window.location.origin}${window.location.pathname}?report_id=${currentReportId}`;
+        const messageText = `Dear Customer,\n\nPlease review and approve the suggested repairs for your vehicle using the link below:\n${approvalUrl}\n\nThank you,\nAutoFix Service`;
+        const encodedText = encodeURIComponent(messageText);
+        const whatsappUrl = `https://wa.me/91${clientPhone}?text=${encodedText}`;
+
+        // 7. On success, redirect the new window to the generated URL.
+        if (whatsappWindow) {
+            whatsappWindow.location.href = whatsappUrl;
+        }
+
+        showSuccessMessage("Approval link sent and job moved to 'Awaiting Response'.");
+        resetVehicleUpdateScreen();
+
+    } catch (error) {
+        console.error('Error in sendApprovalLink:', error);
+        showError(`An error occurred: ${error.message}`);
+        if (whatsappWindow) {
+            whatsappWindow.close(); // Close the pop-up if anything fails
+        }
     }
-    
-    const approvalUrl = `${window.location.origin}${window.location.pathname}?report_id=${currentReportId}`;
-    const messageText = `Dear Customer,\n\nPlease review and approve the suggested repairs for your vehicle using the link below:\n${approvalUrl}\n\nThank you,\nAutoFix Service`;
-    
-    const encodedText = encodeURIComponent(messageText);
-    const whatsappUrl = `https://wa.me/91${clientPhone}?text=${encodedText}`;
-    
-    window.open(whatsappUrl, '_blank');
-
-    showSuccessMessage("Approval link sent and job moved to 'Awaiting Response'.");
-    resetVehicleUpdateScreen();
 }
 
         async function populateNotStartedJobs() {
@@ -2842,17 +2878,17 @@ async function sendApprovalLink() {
 
        function selectReportForUpdate(report) {
 	    const complaintsSection = document.getElementById('customer-complaints-update-section');
-            const suggestionsSection = document.getElementById('mechanic-suggestions-update-section');
+          //  const suggestionsSection = document.getElementById('mechanic-suggestions-update-section');
             const isResponsesTabActive = document.getElementById('tab-btn-responses').classList.contains('active-tab');
 
             if (isResponsesTabActive) {
                 // If on the "Responses Received" tab, HIDE the sections
                 complaintsSection.classList.add('hidden');
-                suggestionsSection.classList.add('hidden');
+               // suggestionsSection.classList.add('hidden');
             } else {
                 // On any other tab, make sure they are VISIBLE
                 complaintsSection.classList.remove('hidden');
-                suggestionsSection.classList.remove('hidden');
+               // suggestionsSection.classList.remove('hidden');
             }
             // END OF ADDED LOGIC
 
