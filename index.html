@@ -501,7 +501,7 @@
 <div id="update-form-section" class="card hidden">
     <form onsubmit="event.preventDefault(); saveVehicleUpdate();" class="space-y-6">
         
-        <div>
+        <div id="customer-complaints-update-section">
             <h3 class="text-base font-bold mb-2">Customer's Registered Complaints</h3>
             <div id="customer-complaints-list" class="space-y-2">
                 <p class="text-sm text-gray-500">No original complaints were registered.</p>
@@ -510,7 +510,7 @@
         
         <!-- The new, cleaner layout for adding mechanic suggestions -->
 <!-- This new layout ensures the repair input is always wide enough -->
-<div class="border-t pt-4">
+<div id="mechanic-suggestions-update-section" class="border-t pt-4">
     <label class="form-label">Add New Suggested Repair (from Mechanic)</label>
     <!-- This container will now stack its children vertically on small screens -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-gray-100 rounded-lg">
@@ -1746,66 +1746,71 @@
         
         // --- EXECUTIVE: JOB CARD ---
         async function searchVehicle() {
-            const rawVehicleNumber = document.getElementById('search-vehicle-number').value;
-            const vehicleNumber = normalizeVehicleNumber(rawVehicleNumber);
-            hideAllSections();
-            if (!vehicleNumber) {
-                showError('Please enter a vehicle number.');
-                return;
-            }
-
-            const { data, error } = await sb
-                .from('vehicles')
-                .select(`
-                    id, vehicle_no, fuel_type, odometer, client_name, client_phone, vehicle_name, color, engine_no, chassis_no,
-                    vehicle_models ( brand, model )
-                `)
-                .eq('vehicle_no', vehicleNumber)
-                .single();
-            
-            const odometerWrapper = document.getElementById('odometer-display-wrapper');
-            const clientNameWrapper = document.getElementById('client-name-wrapper');
-            const clientPhoneWrapper = document.getElementById('client-phone-wrapper');
-
-
-            if (data) { 
-                currentVehicleId = data.id;
-                currentOdometer = data.odometer;
-                originalClientName = data.client_name;
-                originalClientPhone = data.client_phone;
-                
-                document.getElementById('detail-vehicle-number').textContent = data.vehicle_no;
-                document.getElementById('detail-brand').textContent = data.vehicle_models.brand;
-                document.getElementById('detail-model').textContent = data.vehicle_models.model;
-                document.getElementById('detail-fuel-type').textContent = data.fuel_type;
-                document.getElementById('detail-vehicle-name').textContent = data.vehicle_name || 'N/A';
-                document.getElementById('detail-color').textContent = data.color || 'N/A';
-                document.getElementById('detail-engine-no').textContent = data.engine_no || 'N/A';
-                document.getElementById('detail-chassis-no').textContent = data.chassis_no || 'N/A';
-
-                clientNameWrapper.innerHTML = `<input type="text" id="detail-client-name-input" class="form-input" value="${data.client_name || ''}">`;
-                clientPhoneWrapper.innerHTML = `<input type="tel" id="detail-client-phone-input" class="form-input" value="${data.client_phone || ''}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');">`;
-                odometerWrapper.innerHTML = `<input type="number" id="detail-odometer-input" class="form-input" value="${data.odometer || 0}">`;
-                
-                document.getElementById('detail-odometer-input').addEventListener('blur', checkOdometer);
-                
-                vehicleDetailsSection.classList.remove('hidden');
-                newComplaintSection.classList.remove('hidden');
-
-                setTimeout(resizeCanvas, 50);
-
-            } else { 
-                currentVehicleId = null;
-                currentOdometer = 0;
-                clientNameWrapper.innerHTML = `<p id="detail-client-name" class="font-semibold"></p>`;
-                clientPhoneWrapper.innerHTML = `<p id="detail-client-phone" class="font-semibold"></p>`;
-                odometerWrapper.innerHTML = `<p id="detail-odometer" class="font-semibold"></p>`;
-                document.getElementById('new-vehicle-number').value = vehicleNumber;
-                populateExecutiveVehicleDropdowns();
-                createVehicleSection.classList.remove('hidden');
-            }
+    const rawVehicleNumber = document.getElementById('search-vehicle-number').value;
+    const vehicleNumber = normalizeVehicleNumber(rawVehicleNumber);
+    hideAllSections();
+    if (!vehicleNumber) {
+        showError('Please enter a vehicle number.');
+        return;
+    }
+    const { data, error } = await sb
+        .from('vehicles')
+        .select(`
+            id, vehicle_no, fuel_type, odometer, client_name, client_phone, vehicle_name, color, engine_no, chassis_no,
+            vehicle_models ( brand, model )
+        `)
+        .eq('vehicle_no', vehicleNumber)
+        .single();
+    const odometerWrapper = document.getElementById('odometer-display-wrapper');
+    const clientNameWrapper = document.getElementById('client-name-wrapper');
+    const clientPhoneWrapper = document.getElementById('client-phone-wrapper');
+    if (data) {
+        // 1. Fetch the odometer reading from the most recently created report for this vehicle.
+        const { data: latestReportData, error: latestReportError } = await sb
+            .from('reports')
+            .select('odometer_reading')
+            .eq('vehicle_id', data.id)
+            // --- THIS IS THE CORRECTED LINE ---
+            .order('created_at', { ascending: false }) // Sort by date to get the most recent report first
+            .limit(1)
+            .maybeSingle();
+        if (latestReportError) {
+            console.error("Error fetching latest odometer:", latestReportError);
         }
-        
+        // 2. Use the reading from the latest report, or fall back to the vehicle's default reading.
+        const latestOdometer = latestReportData?.odometer_reading || data.odometer;
+        // 3. Update the global state with this new, latest odometer reading.
+        currentVehicleId = data.id;
+        currentOdometer = latestOdometer;
+        originalClientName = data.client_name;
+        originalClientPhone = data.client_phone;
+        document.getElementById('detail-vehicle-number').textContent = data.vehicle_no;
+        document.getElementById('detail-brand').textContent = data.vehicle_models.brand;
+        document.getElementById('detail-model').textContent = data.vehicle_models.model;
+        document.getElementById('detail-fuel-type').textContent = data.fuel_type;
+        document.getElementById('detail-vehicle-name').textContent = data.vehicle_name || 'N/A';
+        document.getElementById('detail-color').textContent = data.color || 'N/A';
+        document.getElementById('detail-engine-no').textContent = data.engine_no || 'N/A';
+        document.getElementById('detail-chassis-no').textContent = data.chassis_no || 'N/A';
+        clientNameWrapper.innerHTML = `<input type="text" id="detail-client-name-input" class="form-input" value="${data.client_name || ''}">`;
+        clientPhoneWrapper.innerHTML = `<input type="tel" id="detail-client-phone-input" class="form-input" value="${data.client_phone || ''}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');">`;
+        // 4. Populate the input field with the determined latest odometer reading.
+        odometerWrapper.innerHTML = `<input type="number" id="detail-odometer-input" class="form-input" value="${latestOdometer || 0}">`;
+        document.getElementById('detail-odometer-input').addEventListener('blur', checkOdometer);
+        vehicleDetailsSection.classList.remove('hidden');
+        newComplaintSection.classList.remove('hidden');
+        setTimeout(resizeCanvas, 50);
+    } else {
+        currentVehicleId = null;
+        currentOdometer = 0;
+        clientNameWrapper.innerHTML = `<p id="detail-client-name" class="font-semibold"></p>`;
+        clientPhoneWrapper.innerHTML = `<p id="detail-client-phone" class="font-semibold"></p>`;
+        odometerWrapper.innerHTML = `<p id="detail-odometer" class="font-semibold"></p>`;
+        document.getElementById('new-vehicle-number').value = vehicleNumber;
+        populateExecutiveVehicleDropdowns();
+        createVehicleSection.classList.remove('hidden');
+    }
+}
         async function populateExecutiveVehicleDropdowns() {
             if (vehicleModelsCache.length === 0) { 
                 const { data, error } = await sb.from('vehicle_models').select('*');
@@ -1841,20 +1846,24 @@
         }
 
 	    function checkOdometer() {
-            const newOdometerInput = document.getElementById('detail-odometer-input');
-            const warningSpan = document.getElementById('odometer-warning');
-            const newOdometerValue = parseInt(newOdometerInput.value);
-
-            if (newOdometerValue < currentOdometer) {
-                warningSpan.textContent = 'Reading is lower than last service!';
-                warningSpan.classList.remove('hidden');
-                newOdometerInput.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
-            } else {
-                warningSpan.textContent = '';
-                warningSpan.classList.add('hidden');
-                newOdometerInput.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
-            }
-        }
+    const newOdometerInput = document.getElementById('detail-odometer-input');
+    const warningSpan = document.getElementById('odometer-warning');
+    const newOdometerValue = parseInt(newOdometerInput.value);
+    if (newOdometerValue < currentOdometer) {
+        warningSpan.textContent = 'Reading is lower than last service!';
+        warningSpan.classList.remove('hidden');
+        newOdometerInput.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+        // This is the new part: Hide the warning after 4 seconds
+        setTimeout(() => {
+            warningSpan.classList.add('hidden');
+            newOdometerInput.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+        }, 4000); // 4000 milliseconds = 4 seconds
+    } else {
+        warningSpan.textContent = '';
+        warningSpan.classList.add('hidden');
+        newOdometerInput.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+    }
+}
         
         async function createVehicle() {
             const newVehicle = {
@@ -2832,6 +2841,24 @@ async function sendApprovalLink() {
         }
 
        function selectReportForUpdate(report) {
+	    const complaintsSection = document.getElementById('customer-complaints-update-section');
+            const suggestionsSection = document.getElementById('mechanic-suggestions-update-section');
+            const isResponsesTabActive = document.getElementById('tab-btn-responses').classList.contains('active-tab');
+
+            if (isResponsesTabActive) {
+                // If on the "Responses Received" tab, HIDE the sections
+                complaintsSection.classList.add('hidden');
+                suggestionsSection.classList.add('hidden');
+            } else {
+                // On any other tab, make sure they are VISIBLE
+                complaintsSection.classList.remove('hidden');
+                suggestionsSection.classList.remove('hidden');
+            }
+            // END OF ADDED LOGIC
+
+            document.getElementById('update-tab-container').classList.add('hidden');
+            // ...rest of the function continues here
+       
             document.getElementById('update-tab-container').classList.add('hidden');
             
             currentReportId = report.id;
