@@ -2169,15 +2169,15 @@ function updateComplaintCost(text, newAmount) {
 function recalculateAndUpdateTotal() {
     const totalAmountEl = document.getElementById('approx-total-amount');
     let totalAmount = 0;
-    
-    // Sum costs from original complaints
-    originalComplaintsForUpdate.forEach(item => {
-        totalAmount += item.amount || 0;
-    });
-    
-    // Sum costs from new mechanic suggestions
-    newSuggestions.forEach(item => {
-        totalAmount += item.amount || 0;
+
+    // Find all CHECKED checkboxes in the approval list
+    document.querySelectorAll('#customer-approval-list input[type="checkbox"]:checked').forEach(checkbox => {
+        try {
+            const item = JSON.parse(checkbox.value);
+            totalAmount += item.amount || 0; // Sum the amount of ONLY the checked item
+        } catch (e) {
+            console.error("Could not parse checkbox value for total calculation", e);
+        }
     });
 
     totalAmountEl.textContent = `₹ ${totalAmount.toFixed(2)}`;
@@ -2187,6 +2187,7 @@ function recalculateAndUpdateTotal() {
 // REPLACE the existing renderSuggestions function with this one.
 // This function now populates three different lists for better clarity.
 // This function now generates a smaller amount field for the complaints list.
+// REPLACE the existing function with this new version
 function renderSuggestions(complaints = [], suggestions = [], approved = []) {
     const executiveList = document.getElementById('executive-suggestions-list');
     const customerComplaintsList = document.getElementById('customer-complaints-list');
@@ -2232,17 +2233,15 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
         });
     }
 
-    // --- MODIFICATION STARTS HERE ---
     // 3. Render the COMBINED list for the final approval checklist
     customerApprovalList.innerHTML = '';
-    const allItemsForApproval = [...complaints, ...suggestions]; // Combine both lists
+    const allItemsForApproval = [...complaints, ...suggestions]; 
 
     if (allItemsForApproval.length > 0) {
         allItemsForApproval.forEach(item => {
             const isApproved = approved.some(approvedItem => (approvedItem.text || approvedItem) === item.text);
             const checkboxValue = `'${JSON.stringify(item)}'`;
             
-            // Add a visual tag to distinguish between item types
             const isOriginalComplaint = item.type === 'complaint';
             const bgColor = isOriginalComplaint ? 'bg-gray-100' : 'bg-blue-50';
             const tag = isOriginalComplaint 
@@ -2251,8 +2250,11 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
 
             const approvalItem = document.createElement('label');
             approvalItem.className = `flex items-center gap-3 p-3 ${bgColor} rounded-lg cursor-pointer hover:bg-gray-200`;
+            // FIX: Added onchange="recalculateAndUpdateTotal()" to the input below
             approvalItem.innerHTML = `
-                <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value=${checkboxValue} ${isApproved ? 'checked' : ''}>
+                <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                       onchange="recalculateAndUpdateTotal()" 
+                       value=${checkboxValue} ${isApproved ? 'checked' : ''}>
                 <div class="flex-1 flex justify-between items-center">
                    <span class="font-medium break-all">${item.text}</span>
                     <span class="font-bold text-gray-800">₹${(item.amount || 0).toFixed(2)}</span>
@@ -2264,6 +2266,9 @@ function renderSuggestions(complaints = [], suggestions = [], approved = []) {
     } else {
         customerApprovalList.innerHTML = '<p class="text-sm text-gray-500">No complaints or suggestions available for approval.</p>';
     }
+    
+    recalculateAndUpdateTotal();
+}
     // --- MODIFICATION ENDS HERE ---
     
     recalculateAndUpdateTotal();
